@@ -3,3 +3,5 @@ add_executable(
 
   main.cpp
 )
+
+target_link_libraries(trackme PUBLIC wintoast)
