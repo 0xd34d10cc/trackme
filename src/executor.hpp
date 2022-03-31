@@ -1,37 +1,40 @@
 #pragma once
 
 #include <cstdint>
-#include <chrono>
 #include <functional>
 #include <queue>
 
+#include "time.hpp"
 
-using Clock = std::chrono::system_clock;
-using TimePoint = Clock::time_point;
-using Duration = Clock::duration;
-using Milliseconds = std::chrono::milliseconds;
+
+using TaskFn = std::function<void()>;
 
 class Executor {
 public:
   Executor() = default;
 
-  void spawn(std::function<void()> fn);
-  void spawn_at(TimePoint at, std::function<void()> fn);
-  void spawn_delayed(Duration delay, std::function<void()> fn);
-  void spawn_periodic(Duration period, std::function<void()> fn);
+  void spawn(TaskFn fn);
+  void spawn_at(TimePoint at, TaskFn fn);
+  void spawn_delayed(Duration delay, TaskFn fn);
+  void spawn_periodic(Duration period, TaskFn fn);
 
   uint64_t run();
+  void stop();
 
 private:
+  TaskFn next_task();
+
   struct Task {
     TimePoint execute_at;
-    std::function<void()> fn;
+    TaskFn fn;
 
-    bool operator<(const Task& other) const {
-      // inverted, because we want min heap
+    bool operator>(const Task& other) const {
       return execute_at > other.execute_at;
     }
   };
 
-  std::priority_queue<Task> m_tasks;
+  using TaskQueue = std::priority_queue<Task, std::vector<Task>, std::greater<Task>>;
+
+  bool m_running{ false };
+  TaskQueue m_tasks;
 };
