@@ -17,4 +17,7 @@ target_include_directories(
   PUBLIC deps/WinToast/src/
 )
 
+add_library(json INTERFACE)
+target_include_directories(json INTERFACE deps/json/single_include/)
+
 add_subdirectory(src)

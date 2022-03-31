@@ -3,6 +3,7 @@
 #include <winuser.h>
 
 #include <wintoastlib.h>
+#include <nlohmann/json.hpp>
 
 #include <iostream>
 #include <cstdlib>
@@ -16,6 +17,7 @@
 
 
 using namespace WinToastLib;
+using namespace nlohmann;
 
 using Seconds = std::chrono::seconds;
 
@@ -87,6 +89,17 @@ static bool show_notification(std::string_view text) {
 struct Activity {
   Seconds time_spent{ 0 };
   Seconds time_limit{  Seconds::max() };
+
+  json to_json() const {
+    json activity;
+    activity["time_spent"] = time_spent.count();
+
+    if (time_limit != Seconds::max()) {
+      activity["time_limit"] = time_limit.count();
+    }
+
+    return activity;
+  }
 };
 
 class Tracker {
@@ -111,12 +124,13 @@ public:
     }
   }
 
-  void print_to(std::ostream& os) const {
-    os << "[\n";
+  json to_json() const {
+    json activities;
     for (const auto& [name, activity] : m_activities) {
-      os << name << " - " << activity.time_spent.count() << "s";
+      activities[name] = activity.to_json();
     }
-    os << "]\n" << std::flush;
+
+    return activities;
   }
 
 private:
@@ -129,10 +143,16 @@ int main() {
   Tracker tracker;
   tracker.set_limit("Task Manager", Seconds(5));
 
+  int i = 0;
   while (true) {
+    ++i;
     std::this_thread::sleep_for(Seconds(1));
     auto window = current_active_window();
     tracker.update(window, Seconds(1));
+
+    if (i % 10 == 0) {
+      std::cout << tracker.to_json().dump(4) << std::endl;
+    }
   }
 
   return EXIT_SUCCESS;
