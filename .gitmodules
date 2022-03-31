@@ -1,3 +1,6 @@
 [submodule "deps/WinToast"]
 	path = deps/WinToast
 	url = https://github.com/mohabouje/WinToast
+[submodule "deps/json"]
+	path = deps/json
+	url = https://github.com/nlohmann/json
