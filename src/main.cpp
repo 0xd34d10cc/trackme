@@ -1,13 +1,18 @@
+#define NOMINMAX
 #include <windows.h>
 #include <winuser.h>
+
+#include <wintoastlib.h>
 
 #include <iostream>
 #include <cstdlib>
 #include <thread>
 #include <chrono>
 #include <array>
-
-#include "wintoastlib.h"
+#include <string>
+#include <string_view>
+#include <codecvt>
+#include <unordered_map>
 
 
 using namespace WinToastLib;
@@ -53,35 +58,82 @@ public:
   }
 };
 
-int main() {
+static void init_wintoast() {
   if (!WinToast::isCompatible()) {
-    std::cout << "Not compatible, sadge" << std::endl;
-    return EXIT_FAILURE;
+    return;
   }
 
   auto* toast = WinToast::instance();
   toast->setAppName(L"trackme");
   toast->setAppUserModelId(L"trackme example");
   if (!toast->initialize()) {
-    std::cout << "Failed to initialize" << std::endl;
-    return EXIT_FAILURE;
+    std::cerr << "Failed to initialize wintoast" << std::endl;
+    std::exit(-1);
   }
+}
 
-  WinToastTemplate notification(WinToastTemplate::Text02);
-  notification.setTextField(L"Hello, world", WinToastTemplate::FirstLine);
+static std::wstring to_wstring(std::string_view text) {
+  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+  return converter.from_bytes(text.data(), text.data() + text.size());
+}
+
+static bool show_notification(std::string_view text) {
+  WinToastTemplate notification(WinToastTemplate::Text01);
+  notification.setTextField(to_wstring(text), WinToastTemplate::FirstLine);
   notification.setAudioOption(WinToastTemplate::AudioOption::Default);
-  notification.setAttributionText(L"default");
+  return WinToast::instance()->showToast(notification, new CustomHandler) >= 0;
+}
 
-  if (toast->showToast(notification, new CustomHandler) < 0) {
-    std::cout << "Failed to show notification" << std::endl;
-    return EXIT_FAILURE;
+struct Activity {
+  Seconds time_spent{ 0 };
+  Seconds time_limit{  Seconds::max() };
+};
+
+class Tracker {
+public:
+  Tracker() = default;
+
+  void set_limit(std::string name, Seconds limit) {
+    auto [it, _] = m_activities.emplace(std::move(name), Activity{});
+    it->second.time_limit = limit;
   }
 
-  std::cout << "Success?" << std::endl;
+  void update(std::string window, Seconds spent) {
+    auto [it, _] = m_activities.emplace(std::move(window), Activity{});
+    const auto& name = it->first;
+    auto& activity = it->second;
+
+    const bool limit_exceeded = activity.time_spent > activity.time_limit;
+    activity.time_spent += spent;
+
+    if (!limit_exceeded && activity.time_spent > activity.time_limit) {
+      show_notification(name + " - time exceeded");
+    }
+  }
+
+  void print_to(std::ostream& os) const {
+    os << "[\n";
+    for (const auto& [name, activity] : m_activities) {
+      os << name << " - " << activity.time_spent.count() << "s";
+    }
+    os << "]\n" << std::flush;
+  }
+
+private:
+  std::unordered_map<std::string, Activity> m_activities;
+};
+
+int main() {
+  init_wintoast();
+
+  Tracker tracker;
+  tracker.set_limit("Task Manager", Seconds(5));
+
   while (true) {
     std::this_thread::sleep_for(Seconds(1));
     auto window = current_active_window();
-    std::cout << window << std::endl;
+    tracker.update(window, Seconds(1));
   }
+
   return EXIT_SUCCESS;
 }
