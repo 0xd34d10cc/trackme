@@ -1,3 +1,5 @@
+#include "executor.hpp"
+
 #define NOMINMAX
 #include <windows.h>
 #include <winuser.h>
@@ -5,8 +7,11 @@
 #include <wintoastlib.h>
 #include <nlohmann/json.hpp>
 
-#include <iostream>
 #include <cstdlib>
+#include <cstdint>
+#include <iostream>
+#include <filesystem>
+#include <utility>
 #include <thread>
 #include <chrono>
 #include <array>
@@ -18,6 +23,7 @@
 
 using namespace WinToastLib;
 using namespace nlohmann;
+namespace fs = std::filesystem;
 
 using Seconds = std::chrono::seconds;
 
@@ -79,11 +85,18 @@ static std::wstring to_wstring(std::string_view text) {
   return converter.from_bytes(text.data(), text.data() + text.size());
 }
 
-static bool show_notification(std::string_view text) {
+using NotificationID = int64_t;
+static const NotificationID INVALID_NOTIFICATION = -1;
+
+static NotificationID show_notification(std::string_view text) {
   WinToastTemplate notification(WinToastTemplate::Text01);
   notification.setTextField(to_wstring(text), WinToastTemplate::FirstLine);
   notification.setAudioOption(WinToastTemplate::AudioOption::Default);
-  return WinToast::instance()->showToast(notification, new CustomHandler) >= 0;
+  return WinToast::instance()->showToast(notification, new CustomHandler);
+}
+
+static void hide_notification(NotificationID id) {
+  WinToast::instance()->hideToast(id);
 }
 
 struct Activity {
@@ -120,7 +133,7 @@ public:
     activity.time_spent += spent;
 
     if (!limit_exceeded && activity.time_spent > activity.time_limit) {
-      show_notification(name + " - time exceeded");
+      show_notification(name + " - время вышло, пёс");
     }
   }
 
@@ -137,23 +150,33 @@ private:
   std::unordered_map<std::string, Activity> m_activities;
 };
 
+static fs::path trackme_dir() {
+  if (const char* home = std::getenv("HOME")) {
+    return fs::path(home) / "trackme";
+  } else if (const char* userprofile = std::getenv("userprofile")) {
+    return fs::path(userprofile) / "trackme";
+  } else {
+    return fs::current_path();
+  }
+}
+
 int main() {
   init_wintoast();
 
   Tracker tracker;
   tracker.set_limit("Task Manager", Seconds(5));
 
-  int i = 0;
-  while (true) {
-    ++i;
-    std::this_thread::sleep_for(Seconds(1));
+  Executor executor;
+
+  executor.spawn_periodic(Seconds(1), [&tracker] {
     auto window = current_active_window();
     tracker.update(window, Seconds(1));
+  });
 
-    if (i % 10 == 0) {
-      std::cout << tracker.to_json().dump(4) << std::endl;
-    }
-  }
+  executor.spawn_periodic(Seconds(10), [&tracker] {
+    std::cout << tracker.to_json().dump(4) << std::endl;
+  });
 
+  executor.run();
   return EXIT_SUCCESS;
 }
