@@ -9,7 +9,11 @@ add_executable(
 
   tracker.hpp
   tracker.cpp
- "notification.hpp" "notification.cpp")
+  notification.hpp
+  notification.cpp
+  unicode.hpp
+  unicode.cpp
+)
 
 target_link_libraries(
   trackme

@@ -1,9 +1,7 @@
 #include "notification.hpp"
+#include "unicode.hpp"
 
 #include <wintoastlib.h>
-
-#include <string>
-#include <codecvt>
 
 
 using namespace WinToastLib;
@@ -47,14 +45,9 @@ void init_notifications() {
   }
 }
 
-static std::wstring to_wstring(std::string_view text) {
-  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-  return converter.from_bytes(text.data(), text.data() + text.size());
-}
-
 NotificationID show_notification(std::string_view text) {
   WinToastTemplate notification(WinToastTemplate::Text01);
-  notification.setTextField(to_wstring(text), WinToastTemplate::FirstLine);
+  notification.setTextField(utf8_decode(text.data(), text.size()), WinToastTemplate::FirstLine);
   notification.setAudioOption(WinToastTemplate::AudioOption::Default);
   return WinToast::instance()->showToast(notification, new CustomHandler);
 }

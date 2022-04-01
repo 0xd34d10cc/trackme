@@ -1,12 +1,14 @@
 #include "executor.hpp"
 #include "tracker.hpp"
 #include "notification.hpp"
+#include "unicode.hpp"
 
 #define NOMINMAX
 #include <windows.h>
 #include <winuser.h>
 
 #include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <utility>
 
@@ -15,9 +17,9 @@ namespace fs = std::filesystem;
 
 static std::string current_active_window() {
   HWND handle = GetForegroundWindow();
-  std::array<char, 256> title;
-  int n = GetWindowTextA(handle, title.data(), static_cast<int>(title.size()));
-  return std::string(title.data(), n);
+  std::array<wchar_t, 256> title;
+  int n = GetWindowTextW(handle, title.data(), static_cast<int>(title.size()));
+  return utf8_encode(title.data(), n);
 }
 
 // TODO: implement config & store activity data
@@ -45,7 +47,8 @@ int main() {
   });
 
   executor.spawn_periodic(Seconds(10), [&tracker] {
-    std::cout << tracker.to_json().dump(4) << std::endl;
+    const auto json = tracker.to_json().dump(4);
+    std::cout << json << std::endl;
   });
 
   executor.run();
