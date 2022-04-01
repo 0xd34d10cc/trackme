@@ -13,6 +13,8 @@ add_executable(
   notification.cpp
   unicode.hpp
   unicode.cpp
+  matcher.hpp
+  matcher.cpp
 )
 
 target_link_libraries(

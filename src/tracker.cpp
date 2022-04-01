@@ -2,47 +2,26 @@
 #include "notification.hpp"
 
 
-Json Activity::to_json() const {
-  Json activity;
-  activity["time_spent"] = time_active.count();
+Tracker::Tracker(std::unique_ptr<ActivityMatcher> matcher)
+  : m_matcher(std::move(matcher))
+{}
 
-  if (time_limit != Duration::max()) {
-    activity["time_limit"] = time_limit.count();
+bool Tracker::track(std::string title, Duration time_active) {
+  auto* stats = m_matcher->match(title);
+  if (!stats) {
+    return false;
   }
 
-  return activity;
-}
+  const bool limit_exceeded = stats->active > stats->limit;
+  stats->active += time_active;
 
-void Tracker::set_limit(std::string name, Duration limit) {
-  auto [it, _] = m_activities.emplace(std::move(name), Activity{});
-  it->second.time_limit = limit;
-}
-
-void Tracker::track(std::string title, Duration time_active) {
-  for (auto& group : m_groups) {
-    if (group.track(title, time_active)) {
-      return;
-    }
+  if (!limit_exceeded && stats->active > stats->limit) {
+    show_notification(title + " - time's up");
   }
 
-  auto [it, _] = m_activities.emplace(std::move(title), Activity{});
-  const auto& name = it->first;
-  auto& activity = it->second;
-
-  const bool limit_exceeded = activity.time_active > activity.time_limit;
-  activity.time_active += time_active;
-
-  if (!limit_exceeded && activity.time_active > activity.time_limit) {
-    show_notification(name + " - time's up");
-  }
+  return true;
 }
 
 Json Tracker::to_json() const {
-  Json activities;
-  for (const auto& [name, activity] : m_activities) {
-    activities[name] = activity.to_json();
-  }
-
-  return activities;
-
+  return m_matcher->to_json();
 }

@@ -36,9 +36,10 @@ static fs::path trackme_dir() {
 int main() {
   init_notifications();
 
-  Tracker tracker;
-  tracker.set_limit("Task Manager", Seconds(5));
+  auto matcher = std::make_unique<AnyMatcher>();
+  matcher->set_limit("Task Manager", Seconds(5));
 
+  Tracker tracker{ std::move(matcher) };
   Executor executor;
 
   executor.spawn_periodic(Seconds(1), [&tracker] {
