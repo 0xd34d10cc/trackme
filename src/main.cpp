@@ -36,8 +36,15 @@ static fs::path trackme_dir() {
 int main() {
   init_notifications();
 
-  auto matcher = std::make_unique<AnyGroupMatcher>();
-  matcher->set_limit("Task Manager", Seconds(5));
+  auto matcher = parse_matcher(Json::array({
+    {
+      {"type", "regex"},
+      {"re", "(.*) Mozilla Firefox"}
+    },
+    {
+      {"type", "any"},
+    }
+  }));
 
   Tracker tracker{ std::move(matcher) };
   Executor executor;
