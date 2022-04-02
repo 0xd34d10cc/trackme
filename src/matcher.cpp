@@ -14,6 +14,8 @@ Json Stats::to_json() const {
 
 ActivityMatcher::~ActivityMatcher() {}
 
+AnyGroupMatcher::~AnyGroupMatcher() {}
+
 void AnyGroupMatcher::set_limit(std::string name, Duration limit) {
   m_stats.emplace(std::move(name), Stats{ {}, limit });
 }
@@ -42,4 +44,26 @@ Json AnyGroupMatcher::to_json() const {
   return matcher;
 }
 
-AnyGroupMatcher::~AnyGroupMatcher() {}
+ListMatcher::ListMatcher(std::vector<std::unique_ptr<ActivityMatcher>> matchers)
+  : m_matchers(std::move(matchers))
+{}
+
+ListMatcher::~ListMatcher() {}
+
+Stats* ListMatcher::match(std::string_view name) {
+  for (auto& matcher : m_matchers) {
+    if (auto* stats = matcher->match(name)) {
+      return stats;
+    }
+  }
+
+  return nullptr;
+}
+
+Json ListMatcher::to_json() const {
+  std::vector<Json> matchers;
+  for (const auto& matcher : m_matchers) {
+    matchers.emplace_back(matcher->to_json());
+  }
+  return Json{ std::move(matchers) };
+}

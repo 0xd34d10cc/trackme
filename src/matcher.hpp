@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <unordered_map>
+#include <vector>
 #include <memory>
 
 
@@ -34,11 +35,12 @@ class RegexGroupMatcher: public ActivityMatcher {
 class AnyGroupMatcher: public ActivityMatcher {
 public:
   AnyGroupMatcher() = default;
+  ~AnyGroupMatcher() override;
+
   void set_limit(std::string name, Duration limit);
 
-  virtual Stats* match(std::string_view name) override;
-  virtual Json to_json() const override;
-  virtual ~AnyGroupMatcher() override;
+  Stats* match(std::string_view name) override;
+  Json to_json() const override;
 
 private:
   std::unordered_map<std::string, Stats> m_stats;
@@ -46,7 +48,15 @@ private:
 
 // goes through a list of groups and returns first that can find a match
 class ListMatcher: public ActivityMatcher {
-  // TODO
+public:
+  ListMatcher(std::vector<std::unique_ptr<ActivityMatcher>> matchers);
+  ~ListMatcher() override;
+
+  Stats* match(std::string_view name) override;
+  Json to_json() const override;
+
+private:
+  std::vector<std::unique_ptr<ActivityMatcher>> m_matchers;
 };
 
 // factory function for above
