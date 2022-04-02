@@ -36,7 +36,7 @@ static fs::path trackme_dir() {
 int main() {
   init_notifications();
 
-  auto matcher = std::make_unique<AnyMatcher>();
+  auto matcher = std::make_unique<AnyGroupMatcher>();
   matcher->set_limit("Task Manager", Seconds(5));
 
   Tracker tracker{ std::move(matcher) };

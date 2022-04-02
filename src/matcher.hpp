@@ -26,26 +26,26 @@ public:
 };
 
 // matches activity via regex
-class RegexGroupMatcher : public ActivityMatcher {
+class RegexGroupMatcher: public ActivityMatcher {
   // TODO
 };
 
 // matches *any* activity
-class AnyMatcher : public ActivityMatcher {
+class AnyGroupMatcher: public ActivityMatcher {
 public:
-  AnyMatcher() = default;
+  AnyGroupMatcher() = default;
   void set_limit(std::string name, Duration limit);
 
   virtual Stats* match(std::string_view name) override;
   virtual Json to_json() const override;
-  virtual ~AnyMatcher() override;
+  virtual ~AnyGroupMatcher() override;
 
 private:
   std::unordered_map<std::string, Stats> m_stats;
 };
 
 // goes through a list of groups and returns first that can find a match
-class ListMatcher : public ActivityMatcher {
+class ListMatcher: public ActivityMatcher {
   // TODO
 };
 

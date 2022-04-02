@@ -3,10 +3,10 @@
 
 Json Stats::to_json() const {
   Json stats;
-  stats["active"] = active.count();
+  stats["active"] = to_humantime(active);
 
   if (limit != Duration::max()) {
-    stats["limit"] = limit.count();
+    stats["limit"] = to_humantime(limit);
   }
 
   return stats;
@@ -14,11 +14,11 @@ Json Stats::to_json() const {
 
 ActivityMatcher::~ActivityMatcher() {}
 
-void AnyMatcher::set_limit(std::string name, Duration limit) {
+void AnyGroupMatcher::set_limit(std::string name, Duration limit) {
   m_stats.emplace(std::move(name), Stats{ {}, limit });
 }
 
-Stats* AnyMatcher::match(std::string_view name) {
+Stats* AnyGroupMatcher::match(std::string_view name) {
   std::string n(name); // FIXME: use heterogeneous lookup from C++20
   auto it = m_stats.find(n);
   if (it == m_stats.end()) {
@@ -28,7 +28,7 @@ Stats* AnyMatcher::match(std::string_view name) {
   return &it->second;
 }
 
-Json AnyMatcher::to_json() const {
+Json AnyGroupMatcher::to_json() const {
   Json matcher = {
     {"type", "any"},
     {"stats", Json::object() }
@@ -42,4 +42,4 @@ Json AnyMatcher::to_json() const {
   return matcher;
 }
 
-AnyMatcher::~AnyMatcher() {}
+AnyGroupMatcher::~AnyGroupMatcher() {}

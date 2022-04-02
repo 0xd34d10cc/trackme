@@ -3,10 +3,9 @@ add_executable(
 
   main.cpp
   time.hpp
-
+  time.cpp
   executor.hpp
   executor.cpp
-
   tracker.hpp
   tracker.cpp
   notification.hpp
