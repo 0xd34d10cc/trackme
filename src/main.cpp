@@ -36,15 +36,19 @@ static fs::path trackme_dir() {
 int main() {
   init_notifications();
 
-  auto matcher = parse_matcher(Json::array({
+  auto matcher = parse_matcher({
     {
       {"type", "regex"},
       {"re", "(.*) Mozilla Firefox"}
     },
     {
+      {"type", "regex"},
+      {"re", "Telegram \\((\\d*)\\)"}
+    },
+    {
       {"type", "any"},
     }
-  }));
+  });
 
   Tracker tracker{ std::move(matcher) };
   Executor executor;

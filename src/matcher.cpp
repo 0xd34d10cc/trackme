@@ -105,7 +105,7 @@ Json ListMatcher::to_json() const {
   for (const auto& matcher : m_matchers) {
     matchers.emplace_back(matcher->to_json());
   }
-  return Json{ std::move(matchers) };
+  return std::move(matchers);
 }
 
 std::unique_ptr<ListMatcher> ListMatcher::parse(const Json& data) {
@@ -128,7 +128,7 @@ RegexGroupMatcher::RegexGroupMatcher(std::string re)
   , m_expr(std::move(re))
 {
   if (m_re.mark_count() != 1) {
-    throw std::runtime_error("Expected at least one group in regex");
+    throw std::runtime_error("Expected exactly one group in regex");
   }
 }
 
