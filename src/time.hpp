@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <string>
+#include <string_view>
 
 
 using Clock = std::chrono::system_clock;
@@ -14,3 +15,4 @@ using Minutes = std::chrono::minutes;
 using Hours = std::chrono::hours;
 
 std::string to_humantime(Duration time);
+Duration parse_humantime(std::string_view time);

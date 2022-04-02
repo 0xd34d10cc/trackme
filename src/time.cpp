@@ -2,6 +2,7 @@
 
 #include <array>
 #include <charconv>
+#include <stdexcept>
 
 
 std::string to_humantime(Duration d) {
@@ -31,4 +32,34 @@ std::string to_humantime(Duration d) {
   }
 
   return buffer;
+}
+
+Duration parse_humantime(std::string_view time) {
+  auto d = Duration{};
+
+  while (!time.empty()) {
+    size_t n = 0;
+    auto res = std::from_chars(time.data(), time.data() + time.size(), n);
+    if (res.ec != std::errc()) {
+      throw std::runtime_error("Invalid time format");
+    }
+
+    time.remove_prefix(res.ptr - time.data());
+
+    if (time.starts_with("d")) {
+      d += n * Hours(24);
+    } else if (time.starts_with("h")) {
+      d += n * Hours(1);
+    } else if (time.starts_with("m")) {
+      d += n * Minutes(1);
+    } else if (time.starts_with("s")) {
+      d += n * Seconds(1);
+    } else {
+      throw std::runtime_error("Invalid time suffix");
+    }
+
+    time.remove_prefix(1);
+  };
+
+  return d;
 }
