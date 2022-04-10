@@ -45,6 +45,12 @@ Json StatsGroup::to_json() const {
   return group;
 }
 
+void StatsGroup::clear() {
+  for (auto& [name, stats] : m_stats) {
+    stats.active = Duration();
+  }
+}
+
 StatsGroup StatsGroup::parse(const Json& data) {
   StatsGroup group;
   for (auto& [name, stats] : data.items()) {
@@ -70,6 +76,10 @@ Json AnyGroupMatcher::to_json() const {
     {"type", "any"},
     {"stats", m_stats.to_json() }
   };
+}
+
+void AnyGroupMatcher::clear() {
+  m_stats.clear();
 }
 
 std::unique_ptr<AnyGroupMatcher> AnyGroupMatcher::parse(const Json& data) {
@@ -106,6 +116,12 @@ Json ListMatcher::to_json() const {
     matchers.emplace_back(matcher->to_json());
   }
   return std::move(matchers);
+}
+
+void ListMatcher::clear() {
+  for (auto& matcher : m_matchers) {
+    matcher->clear();
+  }
 }
 
 std::unique_ptr<ListMatcher> ListMatcher::parse(const Json& data) {
@@ -151,6 +167,10 @@ Json RegexGroupMatcher::to_json() const {
     {"re", m_expr},
     {"stats", m_stats.to_json()}
   };
+}
+
+void RegexGroupMatcher::clear() {
+  m_stats.clear();
 }
 
 std::unique_ptr<RegexGroupMatcher> RegexGroupMatcher::parse(const Json& data) {

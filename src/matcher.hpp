@@ -31,6 +31,7 @@ public:
 
   Stats* get(std::string_view name);
   Json to_json() const;
+  void clear();
 
   static StatsGroup parse(const Json& data);
 
@@ -43,6 +44,7 @@ public:
   // returns nullptr if *name* doesn't match any "known" activities
   virtual Stats* match(std::string_view name) = 0;
   virtual Json to_json() const = 0;
+  virtual void clear() = 0;
   virtual ~ActivityMatcher();
 };
 
@@ -54,6 +56,7 @@ public:
 
   Stats* match(std::string_view name) override;
   Json to_json() const override;
+  void clear() override;
 
   void set_limit(std::string_view name, Duration limit);
 
@@ -71,6 +74,7 @@ public:
 
   Stats* match(std::string_view name) override;
   Json to_json() const override;
+  void clear() override;
 
   static std::unique_ptr<ListMatcher> parse(const Json& data);
 
@@ -86,6 +90,7 @@ public:
 
   Stats* match(std::string_view name) override;
   Json to_json() const override;
+  void clear() override;
 
   static std::unique_ptr<RegexGroupMatcher> parse(const Json& data);
 

@@ -12,6 +12,7 @@ public:
 
   bool track(std::string title, Duration spent);
   Json to_json() const;
+  void clear();
 
 private:
   std::unique_ptr<ActivityMatcher> m_matcher;

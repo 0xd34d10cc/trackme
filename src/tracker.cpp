@@ -25,3 +25,7 @@ bool Tracker::track(std::string title, Duration time_active) {
 Json Tracker::to_json() const {
   return m_matcher->to_json();
 }
+
+void Tracker::clear() {
+  m_matcher->clear();
+}
