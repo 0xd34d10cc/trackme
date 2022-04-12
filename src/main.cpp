@@ -72,36 +72,54 @@ static fs::path trackme_dir() {
   }
 }
 
-static void save_data(const ActivityMatcher& matcher, Date today) {
+static fs::path data_path(Date date) {
   const auto dir = trackme_dir();
   if (!fs::exists(dir) && !fs::create_directories(dir)) {
     std::abort();
   }
 
-  const auto name = std::format("{}-{}-{}.json", today.day(), today.month(), today.year());
-  auto file = std::fstream(dir / name, std::fstream::out | std::fstream::binary);
+  const auto name = std::format("{}-{}-{}.json", date.day(), date.month(), date.year());
+  return dir / name;
+}
+
+static std::unique_ptr<ActivityMatcher> load_data(Date date) {
+  auto path = data_path(date);
+  if (!fs::exists(path)) {
+    return nullptr;
+  }
+
+  auto file = std::fstream(path, std::fstream::in | std::fstream::binary);
+  Json data;
+  file >> data;
+  return parse_matcher(data);
+}
+
+static void save_data(const ActivityMatcher& matcher, Date date) {
+  auto file = std::fstream(data_path(date), std::fstream::out | std::fstream::binary);
   file << matcher.to_json().dump(4) << std::flush;
 }
 
 int main() {
   init_notifications();
-  Date today = current_date();
 
-  // TODO: load data from file corresponding to current day, if it exist
-  //       otherwise load matcher from trackme_dir() / config.json
-  auto matcher = parse_matcher({
-    {
-      {"type", "regex"},
-      {"re", "(.*) Mozilla Firefox"}
-    },
-    {
-      {"type", "regex"},
-      {"re", "Telegram \\((\\d*)\\)"}
-    },
-    {
-      {"type", "any"}
-    }
-  });
+  Date today = current_date();
+  auto matcher = load_data(today);
+  if (!matcher) {
+    // TODO: load data from trackme_dir() / config.json instead
+    matcher = parse_matcher({
+      {
+        {"type", "regex"},
+        {"re", "(.*) Mozilla Firefox"}
+      },
+      {
+        {"type", "regex"},
+        {"re", "Telegram \\((\\d*)\\)"}
+      },
+      {
+        {"type", "any"}
+      }
+    });
+  }
 
   Executor executor;
   executor.spawn_periodic(Seconds(1), [&matcher] {
@@ -123,6 +141,7 @@ int main() {
     matcher->clear();
   });
 
+  // TODO: also save data on application exit
   executor.spawn_periodic(Minutes(1), [&matcher, &today] {
     save_data(*matcher, today);
   });
