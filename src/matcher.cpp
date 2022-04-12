@@ -28,10 +28,9 @@ Stats Stats::parse(const Json& data) {
 }
 
 Stats* StatsGroup::get(std::string_view name) {
-  std::string n(name); // FIXME: use heterogeneous lookup from C++20
-  auto it = m_stats.find(n);
+  auto it = m_stats.find(name);
   if (it == m_stats.end()) {
-    it = m_stats.emplace_hint(it, std::move(n), Stats{});
+    it = m_stats.emplace_hint(it, std::string(name), Stats{});
   }
 
   return &it->second;
@@ -158,7 +157,7 @@ Stats* RegexGroupMatcher::match(std::string_view name) {
     return nullptr;
   }
 
-  return m_stats.get(it->str());
+  return m_stats.get(std::string_view(it->first, it->second));
 }
 
 Json RegexGroupMatcher::to_json() const {

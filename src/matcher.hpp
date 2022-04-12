@@ -36,7 +36,20 @@ public:
   static StatsGroup parse(const Json& data);
 
 private:
-  std::unordered_map<std::string, Stats> m_stats;
+  struct StringHasher {
+    using is_transparent = void;
+
+    size_t operator()(const std::string& s) const noexcept {
+      return std::hash<std::string_view>()(std::string_view(s));
+    }
+
+    size_t operator()(std::string_view s) const noexcept {
+      return std::hash<std::string_view>()(s);
+    }
+  };
+
+  using StatsMap = std::unordered_map<std::string, Stats, StringHasher, std::equal_to<>>;
+  StatsMap m_stats;
 };
 
 class ActivityMatcher {
