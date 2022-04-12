@@ -16,11 +16,15 @@ void Executor::spawn_delayed(Duration delay, TaskFn fn) {
 }
 
 void Executor::spawn_periodic(Duration period, TaskFn fn) {
-  spawn_delayed(period, [this, period, f{ std::move(fn) }] () mutable {
+  spawn_periodic_at(Clock::now() + period, period, std::move(fn));
+}
+
+void Executor::spawn_periodic_at(TimePoint at, Duration period, TaskFn fn) {
+  auto next = at + period;
+  spawn_at(at, [this, next, period, f{ std::move(fn) }] () mutable {
     f();
 
-    // FIXME: execution of f() could take a lot of time
-    spawn_periodic(period, std::move(f));
+    spawn_periodic_at(next, period, std::move(f));
   });
 }
 
@@ -29,26 +33,25 @@ TaskFn Executor::next_task() {
     return TaskFn();
   }
 
-  {
-    const auto now = Clock::now();
-    auto& task = m_tasks.top();
-    if (task.execute_at <= now) {
-      auto fn = task.fn;
-      m_tasks.pop();
-      return fn;
-    }
-    std::this_thread::sleep_for(task.execute_at - now);
+  const auto now = Clock::now();
+  auto& task = m_tasks.top();
+  if (task.execute_at <= now) {
+    auto fn = task.fn;
+    m_tasks.pop();
+    return fn;
   }
+
+  std::this_thread::sleep_for(task.execute_at - now);
 
   auto fn = m_tasks.top().fn;
   m_tasks.pop();
   return fn;
 }
 
-uint64_t Executor::run() {
+int Executor::run() {
   m_running = true;
 
-  uint64_t ticks = 0;
+  int ticks = 0;
   while (auto fn = next_task()) {
     fn();
     ++ticks;

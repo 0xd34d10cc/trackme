@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <functional>
 #include <queue>
 
@@ -17,8 +16,9 @@ public:
   void spawn_at(TimePoint at, TaskFn fn);
   void spawn_delayed(Duration delay, TaskFn fn);
   void spawn_periodic(Duration period, TaskFn fn);
+  void spawn_periodic_at(TimePoint at, Duration period, TaskFn fn);
 
-  uint64_t run();
+  int run();
   void stop();
 
 private:

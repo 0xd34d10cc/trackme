@@ -1,11 +1,12 @@
 #include "executor.hpp"
-#include "tracker.hpp"
+#include "matcher.hpp"
 #include "notification.hpp"
 #include "unicode.hpp"
 
 #define NOMINMAX
 #include <windows.h>
 #include <winuser.h>
+#include <psapi.h>
 
 #include <iostream>
 #include <fstream>
@@ -13,13 +14,29 @@
 #include <filesystem>
 #include <utility>
 #include <format>
+#include <array>
+
 
 namespace fs = std::filesystem;
 
 static std::string current_active_window() {
-  HWND handle = GetForegroundWindow();
-  std::array<wchar_t, 256> title;
-  int n = GetWindowTextW(handle, title.data(), static_cast<int>(title.size()));
+  HWND window_handle = GetForegroundWindow();
+  if (!window_handle) {
+    return std::string{};
+  }
+
+  static const int title_size = 256;
+  std::array<wchar_t, title_size> title;
+  int n = GetWindowTextW(window_handle, title.data(), title_size);
+  if (n == 0) {
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(window_handle, &process_id);
+    HANDLE process_handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+    if (process_handle) {
+      n = GetModuleFileNameExW(process_handle, (HMODULE)process_handle, title.data(), title_size);
+      CloseHandle(process_handle);
+    }
+  }
 
 #ifdef _DEBUG
   OutputDebugStringW(title.data());
@@ -29,7 +46,22 @@ static std::string current_active_window() {
   return utf8_encode(title.data(), n);
 }
 
-// TODO: implement config & store activity data
+static bool track(ActivityMatcher& matcher, std::string_view activity, Duration time_active) {
+  auto* stats = matcher.match(activity);
+  if (!stats) {
+    return false;
+  }
+
+  const bool limit_exceeded = stats->active > stats->limit;
+  stats->active += time_active;
+
+  if (!limit_exceeded && stats->active > stats->limit) {
+    show_notification(std::string(activity) + " - time's up");
+  }
+
+  return true;
+}
+
 static fs::path trackme_dir() {
   if (const char* home = std::getenv("HOME")) {
     return fs::path(home) / "trackme";
@@ -40,12 +72,23 @@ static fs::path trackme_dir() {
   }
 }
 
+static void save_data(const ActivityMatcher& matcher, Date today) {
+  const auto dir = trackme_dir();
+  if (!fs::exists(dir) && !fs::create_directories(dir)) {
+    std::abort();
+  }
+
+  const auto name = std::format("{}-{}-{}.json", today.day(), today.month(), today.year());
+  auto file = std::fstream(dir / name, std::fstream::out | std::fstream::binary);
+  file << matcher.to_json().dump(4) << std::flush;
+}
+
 int main() {
   init_notifications();
-
   Date today = current_date();
 
-  // TODO: load matcher from trackme_dir() / config.json
+  // TODO: load data from file corresponding to current day, if it exist
+  //       otherwise load matcher from trackme_dir() / config.json
   auto matcher = parse_matcher({
     {
       {"type", "regex"},
@@ -60,41 +103,29 @@ int main() {
     }
   });
 
-  // TODO: load data from file corresponding to current day, if it exist
-  Tracker tracker{ std::move(matcher) };
   Executor executor;
-
-  executor.spawn_periodic(Seconds(1), [&tracker] {
+  executor.spawn_periodic(Seconds(1), [&matcher] {
     auto window = current_active_window();
-    tracker.track(std::move(window), Seconds(1));
+    if (!window.empty()) {
+      track(*matcher, window, Seconds(1));
+    }
   });
 
-  executor.spawn_periodic(Seconds(10), [&tracker] {
-    const auto json = tracker.to_json().dump(4);
+  executor.spawn_periodic(Seconds(10), [&matcher] {
+    const auto json = matcher->to_json().dump(4);
     std::cout << json << std::endl;
   });
 
-  executor.spawn_periodic(Minutes(1), [&tracker, &today] {
-    Date time = current_date();
-
-    // TODO: avoid losing last minute data of the day
-    if (time != today) {
-      tracker.clear();
-      today = time;
-      return;
-    }
-
-    const auto name = std::format("{}-{}-{}.json", time.day(), time.month(), time.year());
-    const auto dir = trackme_dir();
-    if (!std::filesystem::exists(dir) && !std::filesystem::create_directories(dir)) {
-      std::abort();
-    }
-
-    auto file = std::fstream(dir / name, std::fstream::out | std::fstream::binary);
-    const auto json = tracker.to_json().dump(4);
-    file << json << std::flush;
+  const auto tomorrow = round_up<Days>(Clock::now());
+  executor.spawn_periodic_at(tomorrow+Seconds(1), Days(1), [&matcher, &today] {
+    save_data(*matcher, today);
+    today = current_date();
+    matcher->clear();
   });
 
+  executor.spawn_periodic(Minutes(1), [&matcher, &today] {
+    save_data(*matcher, today);
+  });
 
   executor.run();
   return EXIT_SUCCESS;

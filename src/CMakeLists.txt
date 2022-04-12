@@ -6,8 +6,6 @@ add_executable(
   time.cpp
   executor.hpp
   executor.cpp
-  tracker.hpp
-  tracker.cpp
   notification.hpp
   notification.cpp
   unicode.hpp
