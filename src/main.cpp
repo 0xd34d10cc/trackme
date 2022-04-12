@@ -40,15 +40,12 @@ static fs::path trackme_dir() {
   }
 }
 
-static std::chrono::year_month_day current_date() {
-  return std::chrono::floor<std::chrono::days>(Clock::now());
-}
-
 int main() {
   init_notifications();
 
-  std::chrono::day day = current_date().day();
+  Date today = current_date();
 
+  // TODO: load matcher from trackme_dir() / config.json
   auto matcher = parse_matcher({
     {
       {"type", "regex"},
@@ -63,6 +60,7 @@ int main() {
     }
   });
 
+  // TODO: load data from file corresponding to current day, if it exist
   Tracker tracker{ std::move(matcher) };
   Executor executor;
 
@@ -76,24 +74,25 @@ int main() {
     std::cout << json << std::endl;
   });
 
-  executor.spawn_periodic(Minutes(1), [&tracker, &day] {
-    const auto json = tracker.to_json().dump(4);
-    std::chrono::year_month_day time = current_date();
+  executor.spawn_periodic(Minutes(1), [&tracker, &today] {
+    Date time = current_date();
 
-    // Todo: avoid losing last minute data of the day
-    if (time.day() != day) {
+    // TODO: avoid losing last minute data of the day
+    if (time != today) {
       tracker.clear();
-      day = time.day();
+      today = time;
       return;
     }
 
-    std::string name = std::format("{}-{}-{}.json", time.day(), time.month(), time.year());
+    const auto name = std::format("{}-{}-{}.json", time.day(), time.month(), time.year());
+    const auto dir = trackme_dir();
+    if (!std::filesystem::exists(dir) && !std::filesystem::create_directories(dir)) {
+      std::abort();
+    }
 
-    // TODO: handle case when there is no right trackme directory
-    auto file = std::fstream(trackme_dir()/name, std::fstream::out | std::fstream::binary);
-
-    file << json;
-    file.flush();
+    auto file = std::fstream(dir / name, std::fstream::out | std::fstream::binary);
+    const auto json = tracker.to_json().dump(4);
+    file << json << std::flush;
   });
 
 
