@@ -16,6 +16,7 @@ struct Stats {
   Duration active{ Seconds(0) };
   Duration limit{ Duration::max() };
 
+  void clear();
   Json to_json() const;
   static Stats parse(const Json& data);
 };
@@ -70,8 +71,6 @@ public:
   Stats* match(std::string_view name) override;
   Json to_json() const override;
   void clear() override;
-
-  void set_limit(std::string_view name, Duration limit);
 
   static std::unique_ptr<AnyGroupMatcher> parse(const Json& data);
 

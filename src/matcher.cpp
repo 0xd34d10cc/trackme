@@ -1,6 +1,10 @@
 #include "matcher.hpp"
 
 
+void Stats::clear() {
+  active = Duration{};
+}
+
 Json Stats::to_json() const {
   auto stats = Json::object();
   stats["active"] = to_humantime(active);
@@ -13,18 +17,17 @@ Json Stats::to_json() const {
 }
 
 Stats Stats::parse(const Json& data) {
-  auto active = Duration{};
-  auto limit = Duration{};
+  Stats stats{};
 
   if (data.contains("active")) {
-    active = parse_humantime(data["active"].get<std::string>());
+    stats.active = parse_humantime(data["active"].get<std::string>());
   }
 
   if (data.contains("limit")) {
-    limit = parse_humantime(data["limit"].get<std::string>());
+    stats.limit = parse_humantime(data["limit"].get<std::string>());
   }
 
-  return Stats{ active, limit };
+  return stats;
 }
 
 Stats* StatsGroup::get(std::string_view name) {
@@ -46,7 +49,7 @@ Json StatsGroup::to_json() const {
 
 void StatsGroup::clear() {
   for (auto& [name, stats] : m_stats) {
-    stats.active = Duration();
+    stats.clear();
   }
 }
 
@@ -61,10 +64,6 @@ StatsGroup StatsGroup::parse(const Json& data) {
 ActivityMatcher::~ActivityMatcher() {}
 
 AnyGroupMatcher::~AnyGroupMatcher() {}
-
-void AnyGroupMatcher::set_limit(std::string_view name, Duration limit) {
-  match(name)->limit = limit;
-}
 
 Stats* AnyGroupMatcher::match(std::string_view name) {
   return m_stats.get(name);
