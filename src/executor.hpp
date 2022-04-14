@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <queue>
+#include <atomic>
 
 #include "time.hpp"
 
@@ -19,11 +20,11 @@ public:
   void spawn_periodic_at(TimePoint at, Duration period, TaskFn fn);
 
   int run();
+  int run(TimePoint deadline);
+
   void stop();
 
 private:
-  TaskFn next_task();
-
   struct Task {
     TimePoint execute_at;
     TaskFn fn;
@@ -35,6 +36,6 @@ private:
 
   using TaskQueue = std::priority_queue<Task, std::vector<Task>, std::greater<Task>>;
 
-  bool m_running{ false };
+  std::atomic<bool> m_running{ false };
   TaskQueue m_tasks;
 };

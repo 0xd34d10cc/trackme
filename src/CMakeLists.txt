@@ -12,6 +12,8 @@ add_executable(
   unicode.cpp
   matcher.hpp
   matcher.cpp
+
+  SysTrayDemo.rc
 )
 
 target_link_libraries(
@@ -19,4 +21,9 @@ target_link_libraries(
 
   PUBLIC wintoast
   PUBLIC json
+)
+
+set_target_properties(trackme PROPERTIES
+    WIN32_EXECUTABLE ON
+    MACOSX_BUNDLE ON
 )

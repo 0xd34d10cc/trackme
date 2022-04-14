@@ -22,7 +22,7 @@ std::string to_humantime(Duration d) {
     d -= n * period;
   };
 
-  add(Hours(24), "d");
+  add(Days(1), "d");
   add(Hours(1), "h");
   add(Minutes(1), "m");
   add(Seconds(1), "s");
@@ -39,15 +39,15 @@ Duration parse_humantime(std::string_view time) {
 
   while (!time.empty()) {
     size_t n = 0;
-    auto res = std::from_chars(time.data(), time.data() + time.size(), n);
-    if (res.ec != std::errc()) {
+    const auto [ptr, ec] = std::from_chars(time.data(), time.data() + time.size(), n);
+    if (ec != std::errc()) {
       throw std::runtime_error("Invalid time format");
     }
 
-    time.remove_prefix(res.ptr - time.data());
+    time.remove_prefix(ptr - time.data());
 
     if (time.starts_with("d")) {
-      d += n * Hours(24);
+      d += n * Days(1);
     } else if (time.starts_with("h")) {
       d += n * Hours(1);
     } else if (time.starts_with("m")) {

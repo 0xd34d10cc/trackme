@@ -28,33 +28,39 @@ void Executor::spawn_periodic_at(TimePoint at, Duration period, TaskFn fn) {
   });
 }
 
-TaskFn Executor::next_task() {
-  if (!m_running || m_tasks.empty()) {
-    return TaskFn();
-  }
-
-  const auto now = Clock::now();
-  auto& task = m_tasks.top();
-  if (task.execute_at <= now) {
-    auto fn = task.fn;
-    m_tasks.pop();
-    return fn;
-  }
-
-  std::this_thread::sleep_for(task.execute_at - now);
-
-  auto fn = m_tasks.top().fn;
-  m_tasks.pop();
-  return fn;
+int Executor::run() {
+  return run(TimePoint::max());
 }
 
-int Executor::run() {
+int Executor::run(TimePoint deadline) {
   m_running = true;
-
   int ticks = 0;
-  while (auto fn = next_task()) {
-    fn();
-    ++ticks;
+  auto now = Clock::now();
+  while (m_running) {
+    while (!m_tasks.empty() && m_tasks.top().execute_at < now) {
+      m_tasks.top().fn();
+      m_tasks.pop();
+
+      ++ticks;
+    }
+
+    now = Clock::now();
+    if (!m_running || m_tasks.empty() || now >= deadline) {
+      break;
+    }
+
+    const auto wait_till = m_tasks.top().execute_at;
+    if (wait_till >= deadline) {
+      break;
+    }
+
+    if (wait_till < now) {
+      continue;
+    }
+
+    // TODO: wait on condvar to reduce stop() latency
+    std::this_thread::sleep_for(wait_till - now);
+    now = Clock::now();
   }
 
   return ticks;
