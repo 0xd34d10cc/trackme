@@ -137,6 +137,50 @@ std::unique_ptr<ListMatcher> ListMatcher::parse(const Json& data) {
   return std::make_unique<ListMatcher>(std::move(matchers));
 }
 
+RegexMatcher::RegexMatcher(std::string re)
+  : m_re(re)
+  , m_expr(std::move(re))
+{
+  if (m_re.mark_count() != 0) {
+    throw std::runtime_error("Expected no groups in regex");
+  }
+}
+
+RegexMatcher::~RegexMatcher() {}
+
+Stats* RegexMatcher::match(std::string_view name) {
+  if (std::regex_match(name.data(), name.data() + name.size(), m_re)) {
+    return &m_stats;
+  }
+
+  return nullptr;
+}
+
+Json RegexMatcher::to_json() const {
+  return {
+    {"type", "regex"},
+    {"re", m_expr},
+    {"stats", m_stats.to_json()}
+  };
+}
+
+void RegexMatcher::clear() {
+  m_stats.clear();
+}
+
+std::unique_ptr<RegexMatcher> RegexMatcher::parse(const Json& data) {
+  if (data["type"] != "regex") {
+    throw std::runtime_error("Failed to parse RegexMatcher: type must be 'regex'");
+  }
+
+  auto matcher = std::make_unique<RegexMatcher>(data["re"].get<std::string>());
+  if (data.contains("stats")) {
+    matcher->m_stats = Stats::parse(data["stats"]);
+  }
+
+  return matcher;
+}
+
 RegexGroupMatcher::RegexGroupMatcher(std::string re)
   : m_re(re)
   , m_expr(std::move(re))
@@ -161,7 +205,7 @@ Stats* RegexGroupMatcher::match(std::string_view name) {
 
 Json RegexGroupMatcher::to_json() const {
   return {
-    {"type", "regex"},
+    {"type", "regex_group"},
     {"re", m_expr},
     {"stats", m_stats.to_json()}
   };
@@ -172,8 +216,8 @@ void RegexGroupMatcher::clear() {
 }
 
 std::unique_ptr<RegexGroupMatcher> RegexGroupMatcher::parse(const Json& data) {
-  if (data["type"] != "regex") {
-    throw std::runtime_error("Failed to parse RegexGroupMatcher: type must be 'regex'");
+  if (data["type"] != "regex_group") {
+    throw std::runtime_error("Failed to parse RegexGroupMatcher: type must be 'regex_group'");
   }
 
   auto matcher = std::make_unique<RegexGroupMatcher>(data["re"].get<std::string>());
@@ -188,11 +232,16 @@ std::unique_ptr<ActivityMatcher> parse_matcher(const Json& data) {
     return ListMatcher::parse(data);
   }
 
-  if (data["type"] == "any") {
+  const auto type = data["type"];
+  if (type == "any") {
     return AnyGroupMatcher::parse(data);
   }
 
-  if (data["type"] == "regex") {
+  if (type == "regex") {
+    return RegexMatcher::parse(data);
+  }
+
+  if (type == "regex_group") {
     return RegexGroupMatcher::parse(data);
   }
 

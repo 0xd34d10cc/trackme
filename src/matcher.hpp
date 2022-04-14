@@ -95,7 +95,24 @@ private:
 };
 
 // matches activity via regex
-class RegexGroupMatcher : public ActivityMatcher {
+class RegexMatcher: public ActivityMatcher {
+public:
+  RegexMatcher(std::string re);
+  ~RegexMatcher() override;
+
+  Stats* match(std::string_view name) override;
+  Json to_json() const override;
+  void clear() override;
+
+  static std::unique_ptr<RegexMatcher> parse(const Json& data);
+
+private:
+  std::regex m_re;
+  std::string m_expr;
+  Stats m_stats;
+};
+
+class RegexGroupMatcher: public ActivityMatcher {
 public:
   RegexGroupMatcher(std::string re);
   ~RegexGroupMatcher() override;

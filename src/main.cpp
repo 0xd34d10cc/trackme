@@ -134,12 +134,12 @@ int WINAPI WinMain(
     // TODO: load data from trackme_dir() / config.json instead
     matcher = parse_matcher({
       {
-        {"type", "regex"},
+        {"type", "regex_group"},
         {"re", "(.*) Mozilla Firefox"}
       },
       {
         {"type", "regex"},
-        {"re", "Telegram \\((\\d*)\\)"}
+        {"re", "Telegram (\\d*)"}
       },
       {
         {"type", "any"}
@@ -172,8 +172,9 @@ int WINAPI WinMain(
     save_data(*matcher, today);
   });
 
-	auto tracker_thread = std::thread([&executor] {
+	auto tracker_thread = std::thread([&executor, &matcher, &today] {
 		executor.run();
+		save_data(*matcher, today);
 	});
 
 	UNREFERENCED_PARAMETER(hPrevInstance);
@@ -217,7 +218,6 @@ int WINAPI WinMain(
 
 	executor.stop();
 	tracker_thread.join();
-	save_data(*matcher, today);
 	return (int)msg.wParam;
 }
 
