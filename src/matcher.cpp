@@ -48,8 +48,15 @@ Json StatsGroup::to_json() const {
 }
 
 void StatsGroup::clear() {
-  for (auto& [name, stats] : m_stats) {
-    stats.clear();
+  auto it = m_stats.begin();
+  while (it != m_stats.end()) {
+    auto& stats = it->second;
+    if (!stats.has_limit()) {
+      it = m_stats.erase(it);
+    } else {
+      stats.clear();
+      ++it;
+    }
   }
 }
 

@@ -16,6 +16,10 @@ struct Stats {
   Duration active{ Seconds(0) };
   Duration limit{ Duration::max() };
 
+  bool has_limit() const noexcept {
+    return limit != Duration::max();
+  }
+
   void clear();
   Json to_json() const;
   static Stats parse(const Json& data);
