@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include "executor.hpp"
 #include "matcher.hpp"
 #include "notification.hpp"
@@ -37,7 +38,6 @@ static Duration idle_time() {
 
   return Milliseconds(diff_time);
 }
-
 
 static std::string current_active_window() {
   HWND window_handle = GetForegroundWindow();
@@ -92,6 +92,19 @@ static fs::path trackme_dir() {
   } else {
     return fs::current_path();
   }
+}
+
+static Config get_config() {
+  Json config_data = Json::object();
+  auto config_path = trackme_dir() / "config.json";
+
+  if (fs::exists(config_path)) {
+    auto config_file =
+        std::fstream(config_path, std::fstream::in | std::fstream::binary);
+    config_file >> config_data;
+  }
+
+  return Config(config_data);
 }
 
 static fs::path data_path(Date date) {
@@ -259,22 +272,17 @@ int WINAPI WinMain(_In_ HINSTANCE instance,
 
   Date today = current_date();
   auto matcher = load_data(today);
+  auto config = get_config();
+
   if (!matcher) {
-    // TODO: load data from trackme_dir() / config.json instead
-    matcher = parse_matcher(
-        {{{"type", "regex_group"}, {"re", "(.*)Mozilla Firefox"}},
-         {{"type", "regex_group"}, {"re", "(.*)Discord"}},
-         {{"type", "regex_group"}, {"re", "(.*)Microsoft Visual Studio"}},
-         {{"type", "regex_group"}, {"re", "(.*)Visual Studio Code"}},
-         {{"type", "regex"}, {"re", "Telegram.*"}},
-         {{"type", "any"}}});
+    matcher = std::move(config.matcher);
   }
 
   Executor executor;
-  executor.spawn_periodic(Seconds(1), [&matcher] {
+  executor.spawn_periodic(Seconds(1), [&matcher, max_period = config.max_idle_time] {
     auto window = current_active_window();
     if (!window.empty() && !paused) {
-      if (idle_time() < Minutes(1)) {
+      if (idle_time() < max_period) {
         track(*matcher, window, Seconds(1));
       }
 #ifdef _DEBUG
@@ -298,7 +306,7 @@ int WINAPI WinMain(_In_ HINSTANCE instance,
                                matcher->clear();
                              });
 
-  executor.spawn_periodic(Minutes(1),
+  executor.spawn_periodic(config.dump_data_period,
                           [&matcher, &today] { save_data(*matcher, today); });
 
   auto tracker_thread = std::thread([&executor, &matcher, &today] {
