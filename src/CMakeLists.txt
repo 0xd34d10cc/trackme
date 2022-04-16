@@ -12,8 +12,6 @@ add_executable(
   unicode.cpp
   matcher.hpp
   matcher.cpp
-
-  SysTrayDemo.rc
 )
 
 target_link_libraries(

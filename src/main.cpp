@@ -100,31 +100,24 @@ static void save_data(const ActivityMatcher& matcher, Date date) {
   file << matcher.to_json().dump(4) << std::flush;
 }
 
-#include "resource.h"
-
 #define MAX_LOADSTRING 100
 #define	WM_USER_SHELLICON WM_USER + 1
 
 // Global Variables:
-HINSTANCE hInst;	// current instance
+// TODO: remove
 NOTIFYICONDATA nidApp;
 HMENU hPopMenu;
-TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
-TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
-TCHAR szApplicationToolTip[MAX_LOADSTRING];	    // the main window class name
-BOOL bDisable = FALSE;							// keep application state
 
 // Forward declarations of functions included in this code module:
 ATOM MyRegisterClass(HINSTANCE hInstance);
 BOOL InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 
 int WINAPI WinMain(
-  HINSTANCE hInstance,
-  HINSTANCE hPrevInstance,
-  LPSTR     lpCmdLine,
-  int       nCmdShow
+	_In_ HINSTANCE hInstance,
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPSTR     lpCmdLine,
+	_In_ int       nCmdShow
 ) {
   init_notifications();
 
@@ -139,7 +132,7 @@ int WINAPI WinMain(
       },
       {
         {"type", "regex"},
-        {"re", "Telegram (\\d*)"}
+        {"re", "Telegram \\(\\d*\\)"}
       },
       {
         {"type", "any"}
@@ -167,7 +160,6 @@ int WINAPI WinMain(
     matcher->clear();
   });
 
-  // TODO: also save data on application exit
   executor.spawn_periodic(Minutes(1), [&matcher, &today] {
     save_data(*matcher, today);
   });
@@ -182,11 +174,6 @@ int WINAPI WinMain(
 
 	// TODO: Place code here.
 	MSG msg;
-	HACCEL hAccelTable;
-
-	// Initialize global strings
-	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-	LoadString(hInstance, IDC_SYSTRAYDEMO, szWindowClass, MAX_LOADSTRING);
 
 	MyRegisterClass(hInstance);
 
@@ -194,8 +181,6 @@ int WINAPI WinMain(
 	if (!InitInstance(hInstance, nCmdShow)) {
 		return FALSE;
 	}
-
-	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_SYSTRAYDEMO));
 
 	// Main message loop:
 	bool running = true;
@@ -208,10 +193,10 @@ int WINAPI WinMain(
 					break;
 				}
 
-				if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
-				}
+				// if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+				//	}
 			}
 		}
 	}
@@ -234,8 +219,7 @@ int WINAPI WinMain(
 //    so that the application will get 'well formed' small icons associated
 //    with it.
 //
-ATOM MyRegisterClass(HINSTANCE hInstance)
-{
+ATOM MyRegisterClass(HINSTANCE hInstance) {
 	WNDCLASSEX wcex;
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
@@ -245,12 +229,13 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hInstance;
-	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SYSTRAYDEMO));
+
+	wcex.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wcex.lpszMenuName = MAKEINTRESOURCE(IDC_SYSTRAYDEMO);
-	wcex.lpszClassName = szWindowClass;
-	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+	wcex.lpszMenuName = "trackme";
+	wcex.lpszClassName = "trackme_systray";
+	wcex.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 
 	return RegisterClassEx(&wcex);
 }
@@ -265,39 +250,28 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        In this function, we save the instance handle in a global variable and
 //        create and display the main program window.
 //
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-	HWND hWnd;
-	HICON hMainIcon;
-
-	hInst = hInstance; // Store instance handle in our global variable
-
-	hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
+	const char* title = "trackme";
+	const char* window_class = "trackme_systray";
+	HWND hWnd = CreateWindow(window_class, title, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
-	if (!hWnd)
-	{
+	if (!hWnd) {
 		return FALSE;
 	}
 
-	hMainIcon = LoadIcon(hInstance, (LPCTSTR)MAKEINTRESOURCE(IDI_SYSTRAYDEMO));
-
 	nidApp.cbSize = sizeof(NOTIFYICONDATA); // sizeof the struct in bytes
 	nidApp.hWnd = (HWND)hWnd;              //handle of the window which will process this app. messages
-	nidApp.uID = IDI_SYSTRAYDEMO;           //ID of the icon that willl appear in the system tray
+	nidApp.uID = 32512;           //ID of the icon that willl appear in the system tray
 	nidApp.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; //ORing of all the flags
-	nidApp.hIcon = hMainIcon; // handle of the Icon to be displayed, obtained from LoadIcon
+	nidApp.hIcon = LoadIcon(NULL, IDI_APPLICATION); // handle of the Icon to be displayed, obtained from LoadIcon
 	nidApp.uCallbackMessage = WM_USER_SHELLICON;
-	LoadString(hInstance, IDS_APPTOOLTIP, nidApp.szTip, MAX_LOADSTRING);
+	std::strncpy(nidApp.szTip, title, sizeof(nidApp.szTip));
 	Shell_NotifyIcon(NIM_ADD, &nidApp);
 
 	return TRUE;
 }
 
-void Init()
-{
-	// user defined message that will be sent as the notification message to the Window Procedure
-}
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -308,10 +282,12 @@ void Init()
 //  WM_DESTROY	- post a quit message and return
 //
 //
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	int wmId, wmEvent;
 	POINT lpClickPoint;
+
+	// static const uint32_t menu_item_id = IDM_EXIT;
+	static const uint32_t menu_item_id = 1337;
 
 	switch (message) {
 		case WM_USER_SHELLICON:
@@ -321,7 +297,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					UINT uFlag = MF_BYPOSITION | MF_STRING;
 					GetCursorPos(&lpClickPoint);
 					hPopMenu = CreatePopupMenu();
-					InsertMenu(hPopMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, IDM_EXIT, "Exit");
+					BOOL its_fine = InsertMenu(hPopMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, menu_item_id, "Exit");
+					assert(its_fine);
 					SetForegroundWindow(hWnd);
 					TrackPopupMenu(hPopMenu, TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN, lpClickPoint.x, lpClickPoint.y, 0, hWnd, NULL);
 					return TRUE;
@@ -332,7 +309,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			wmEvent = HIWORD(wParam);
 			// Parse the menu selections:
 			switch (wmId) {
-				case IDM_EXIT:
+				case menu_item_id:
 					Shell_NotifyIcon(NIM_DELETE, &nidApp);
 					DestroyWindow(hWnd);
 					break;
