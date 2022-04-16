@@ -21,6 +21,24 @@
 
 namespace fs = std::filesystem;
 
+static Duration idle_time() {
+  LASTINPUTINFO last_input;
+  last_input.cbSize = sizeof(LASTINPUTINFO);
+  if (!GetLastInputInfo(&last_input)) {
+    assert(false);
+    return Seconds(0);
+  }
+
+  auto diff_time = GetTickCount() - last_input.dwTime;
+
+  if (diff_time < 0) {
+    return Seconds(0);
+  }
+
+  return Milliseconds(diff_time);
+}
+
+
 static std::string current_active_window() {
   HWND window_handle = GetForegroundWindow();
   if (!window_handle) {
@@ -256,7 +274,14 @@ int WINAPI WinMain(_In_ HINSTANCE instance,
   executor.spawn_periodic(Seconds(1), [&matcher] {
     auto window = current_active_window();
     if (!window.empty() && !paused) {
-      track(*matcher, window, Seconds(1));
+      if (idle_time() < Minutes(1)) {
+        track(*matcher, window, Seconds(1));
+      }
+#ifdef _DEBUG
+      else {
+        OutputDebugStringW(L"USER IS NOT HERE\n");
+      }
+#endif
     }
   });
 
