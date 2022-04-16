@@ -9,15 +9,15 @@
 #include <psapi.h>
 #include <strsafe.h>
 
-#include <iostream>
-#include <fstream>
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <filesystem>
-#include <utility>
 #include <format>
-#include <array>
+#include <fstream>
+#include <iostream>
 #include <thread>
-
+#include <utility>
 
 namespace fs = std::filesystem;
 
@@ -33,7 +33,8 @@ static std::string current_active_window() {
   if (n == 0) {
     DWORD process_id = 0;
     GetWindowThreadProcessId(window_handle, &process_id);
-    HANDLE process_handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+    HANDLE process_handle =
+        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
     if (process_handle) {
       n = GetProcessImageFileNameW(process_handle, title.data(), title_size);
       CloseHandle(process_handle);
@@ -48,7 +49,8 @@ static std::string current_active_window() {
   return utf8_encode(title.data(), n);
 }
 
-static bool track(ActivityMatcher& matcher, std::string_view activity, Duration time_active) {
+static bool track(ActivityMatcher& matcher, std::string_view activity,
+                  Duration time_active) {
   auto* stats = matcher.match(activity);
   if (!stats) {
     return false;
@@ -80,7 +82,8 @@ static fs::path data_path(Date date) {
     std::abort();
   }
 
-  const auto name = std::format("{}-{}-{}.json", date.day(), date.month(), date.year());
+  const auto name =
+      std::format("{}-{}-{}.json", date.day(), date.month(), date.year());
   return dir / name;
 }
 
@@ -97,23 +100,28 @@ static std::unique_ptr<ActivityMatcher> load_data(Date date) {
 }
 
 static void save_data(const ActivityMatcher& matcher, Date date) {
-  auto file = std::fstream(data_path(date), std::fstream::out | std::fstream::binary);
+  auto file =
+      std::fstream(data_path(date), std::fstream::out | std::fstream::binary);
   file << matcher.to_json().dump(4) << std::flush;
 }
 
-#define	WM_USER_SHELLICON WM_USER + 1
+#define WM_USER_SHELLICON WM_USER + 1
 
 // Global Variables:
 // TODO: find a way to get rid of it
 NOTIFYICONDATA nidApp;
 
-LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+static std::atomic<bool> paused = false;
+
+LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
+                                   LPARAM lParam) {
   int wmId, wmEvent;
   POINT lpClickPoint;
   HMENU hPopMenu;
 
   // static const uint32_t menu_item_id = IDM_EXIT;
-  static const uint32_t menu_item_id = 1337;
+  static const uint32_t menu_exit_id = 1337;
+  static const uint32_t menu_pause_id = 1338;
 
   switch (message) {
     case WM_USER_SHELLICON:
@@ -124,7 +132,9 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam, LPARA
           GetCursorPos(&lpClickPoint);
           hPopMenu = CreatePopupMenu();
           InsertMenu(hPopMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING,
-                     menu_item_id, L"Exit");
+                     menu_pause_id, paused ? L"Resume" : L"Pause");
+          InsertMenu(hPopMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING,
+                     menu_exit_id, L"Exit");
           SetForegroundWindow(hWnd);
           TrackPopupMenu(hPopMenu,
                          TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN,
@@ -137,9 +147,12 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam, LPARA
       wmEvent = HIWORD(wParam);
       // Parse the menu selections:
       switch (wmId) {
-        case menu_item_id:
+        case menu_exit_id:
           Shell_NotifyIcon(NIM_DELETE, &nidApp);
           DestroyWindow(hWnd);
+          break;
+        case menu_pause_id:
+          paused = !paused;
           break;
         default:
           return DefWindowProc(hWnd, message, wParam, lParam);
@@ -186,13 +199,16 @@ static void init_win32(HINSTANCE instance) {
   }
 
   nidApp.cbSize = sizeof(NOTIFYICONDATA);  // sizeof the struct in bytes
-  nidApp.hWnd = (HWND)hWnd;  // handle of the window which will process this app. messages
+  nidApp.hWnd =
+      (HWND)hWnd;  // handle of the window which will process this app. messages
   nidApp.uID = 32512;  // ID of the icon that willl appear in the system tray
   nidApp.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;  // ORing of all the flags
-  nidApp.hIcon = LoadIcon(NULL, IDI_APPLICATION);  // handle of the Icon to be displayed,
-                                                   // obtained from LoadIcon
+  nidApp.hIcon =
+      LoadIcon(NULL, IDI_APPLICATION);  // handle of the Icon to be displayed,
+                                        // obtained from LoadIcon
   nidApp.uCallbackMessage = WM_USER_SHELLICON;
-  StringCchCopyW(nidApp.szTip, sizeof(nidApp.szTip) / sizeof(nidApp.szTip[0]), title);
+  StringCchCopyW(nidApp.szTip, sizeof(nidApp.szTip) / sizeof(nidApp.szTip[0]),
+                 title);
   Shell_NotifyIcon(NIM_ADD, &nidApp);
 }
 
@@ -216,11 +232,9 @@ static void run_win32_event_loop() {
   }
 }
 
-int WINAPI WinMain(
-	_In_ HINSTANCE instance,
-	_In_opt_ HINSTANCE /*hPrevInstance*/,
-	_In_ LPSTR     /*lpCmdLine*/,
-	_In_ int       /*nCmdShow*/
+int WINAPI WinMain(_In_ HINSTANCE instance,
+                   _In_opt_ HINSTANCE /*hPrevInstance*/,
+                   _In_ LPSTR /*lpCmdLine*/, _In_ int /*nCmdShow*/
 ) {
   init_win32(instance);
   init_notifications();
@@ -229,37 +243,19 @@ int WINAPI WinMain(
   auto matcher = load_data(today);
   if (!matcher) {
     // TODO: load data from trackme_dir() / config.json instead
-    matcher = parse_matcher({
-      {
-        {"type", "regex_group"},
-        {"re", "(.*)Mozilla Firefox"}
-      },
-      {
-        {"type", "regex_group"},
-        {"re", "(.*)Discord"}
-      },
-      {
-        {"type", "regex_group"},
-        {"re", "(.*)Microsoft Visual Studio"}
-      },
-      {
-        {"type", "regex_group"},
-        {"re", "(.*)Visual Studio Code"}
-      },
-      {
-        {"type", "regex"},
-        {"re", "Telegram.*"}
-      },
-      {
-        {"type", "any"}
-      }
-    });
+    matcher = parse_matcher(
+        {{{"type", "regex_group"}, {"re", "(.*)Mozilla Firefox"}},
+         {{"type", "regex_group"}, {"re", "(.*)Discord"}},
+         {{"type", "regex_group"}, {"re", "(.*)Microsoft Visual Studio"}},
+         {{"type", "regex_group"}, {"re", "(.*)Visual Studio Code"}},
+         {{"type", "regex"}, {"re", "Telegram.*"}},
+         {{"type", "any"}}});
   }
 
   Executor executor;
   executor.spawn_periodic(Seconds(1), [&matcher] {
     auto window = current_active_window();
-    if (!window.empty()) {
+    if (!window.empty() && !paused) {
       track(*matcher, window, Seconds(1));
     }
   });
@@ -270,24 +266,23 @@ int WINAPI WinMain(
   });
 
   const auto tomorrow = round_up<Days>(Clock::now());
-  executor.spawn_periodic_at(tomorrow+Seconds(1), Days(1), [&matcher, &today] {
+  executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1),
+                             [&matcher, &today] {
+                               save_data(*matcher, today);
+                               today = current_date();
+                               matcher->clear();
+                             });
+
+  executor.spawn_periodic(Minutes(1),
+                          [&matcher, &today] { save_data(*matcher, today); });
+
+  auto tracker_thread = std::thread([&executor, &matcher, &today] {
+    executor.run();
     save_data(*matcher, today);
-    today = current_date();
-    matcher->clear();
   });
-
-  executor.spawn_periodic(Minutes(1), [&matcher, &today] {
-    save_data(*matcher, today);
-  });
-
-	auto tracker_thread = std::thread([&executor, &matcher, &today] {
-		executor.run();
-		save_data(*matcher, today);
-	});
-
 
   run_win32_event_loop();
-	executor.stop();
-	tracker_thread.join();
-	return EXIT_SUCCESS;
+  executor.stop();
+  tracker_thread.join();
+  return EXIT_SUCCESS;
 }
