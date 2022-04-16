@@ -14,6 +14,14 @@ add_executable(
   matcher.cpp
 )
 
+target_compile_definitions(
+  trackme
+
+  PUBLIC UNICODE
+  PUBLIC _UNICODE
+  PUBLIC _CRT_SECURE_NO_WARNINGS
+)
+
 target_link_libraries(
   trackme
 
@@ -21,7 +29,9 @@ target_link_libraries(
   PUBLIC json
 )
 
-set_target_properties(trackme PROPERTIES
-    WIN32_EXECUTABLE ON
-    MACOSX_BUNDLE ON
+set_target_properties(
+  trackme PROPERTIES
+
+  WIN32_EXECUTABLE ON
+  MACOSX_BUNDLE ON
 )

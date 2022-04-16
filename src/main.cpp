@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <winuser.h>
 #include <psapi.h>
+#include <strsafe.h>
 
 #include <iostream>
 #include <fstream>
@@ -123,7 +124,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam, LPARA
           GetCursorPos(&lpClickPoint);
           hPopMenu = CreatePopupMenu();
           InsertMenu(hPopMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING,
-                     menu_item_id, "Exit");
+                     menu_item_id, L"Exit");
           SetForegroundWindow(hWnd);
           TrackPopupMenu(hPopMenu,
                          TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN,
@@ -154,8 +155,8 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam, LPARA
 }
 
 static void init_win32(HINSTANCE instance) {
-  static const char* title = "trackme";
-  static const char* class_name = "trackme_systray";
+  static const wchar_t* title = L"trackme";
+  static const wchar_t* class_name = L"trackme_systray";
 
   WNDCLASSEX wcex;
   wcex.cbSize = sizeof(WNDCLASSEX);
@@ -176,8 +177,9 @@ static void init_win32(HINSTANCE instance) {
   RegisterClassEx(&wcex);
 
   // Perform application initialization:
-  HWND hWnd = CreateWindow(class_name, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, 0,
-      CW_USEDEFAULT, 0, NULL, NULL, instance, NULL);
+  HWND hWnd =
+      CreateWindow(class_name, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, 0,
+                   CW_USEDEFAULT, 0, NULL, NULL, instance, NULL);
 
   if (!hWnd) {
     abort();
@@ -190,7 +192,7 @@ static void init_win32(HINSTANCE instance) {
   nidApp.hIcon = LoadIcon(NULL, IDI_APPLICATION);  // handle of the Icon to be displayed,
                                                    // obtained from LoadIcon
   nidApp.uCallbackMessage = WM_USER_SHELLICON;
-  std::strncpy(nidApp.szTip, title, sizeof(nidApp.szTip));
+  StringCchCopyW(nidApp.szTip, sizeof(nidApp.szTip) / sizeof(nidApp.szTip[0]), title);
   Shell_NotifyIcon(NIM_ADD, &nidApp);
 }
 
@@ -230,11 +232,23 @@ int WINAPI WinMain(
     matcher = parse_matcher({
       {
         {"type", "regex_group"},
-        {"re", "(.*) Mozilla Firefox"}
+        {"re", "(.*)Mozilla Firefox"}
+      },
+      {
+        {"type", "regex_group"},
+        {"re", "(.*)Discord"}
+      },
+      {
+        {"type", "regex_group"},
+        {"re", "(.*)Microsoft Visual Studio"}
+      },
+      {
+        {"type", "regex_group"},
+        {"re", "(.*)Visual Studio Code"}
       },
       {
         {"type", "regex"},
-        {"re", "Telegram \\(\\d*\\)"}
+        {"re", "Telegram.*"}
       },
       {
         {"type", "any"}
