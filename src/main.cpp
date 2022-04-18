@@ -27,16 +27,12 @@ static Duration idle_time() {
   last_input.cbSize = sizeof(LASTINPUTINFO);
   if (!GetLastInputInfo(&last_input)) {
     assert(false);
-    return Seconds(0);
+    return Duration();
   }
 
-  auto diff_time = GetTickCount() - last_input.dwTime;
-
-  if (diff_time < 0) {
-    return Seconds(0);
-  }
-
-  return Milliseconds(diff_time);
+  const auto now = GetTickCount();
+  const auto elapsed = now - last_input.dwTime;
+  return elapsed > 0 ? Milliseconds(elapsed) : Duration();
 }
 
 static std::string current_active_window() {
@@ -94,17 +90,17 @@ static fs::path trackme_dir() {
   }
 }
 
-static Config get_config() {
-  Json config_data = Json::object();
-  auto config_path = trackme_dir() / "config.json";
+static Config load_config() {
+  Json data = Json::object();
+  const auto path = trackme_dir() / "config.json";
 
-  if (fs::exists(config_path)) {
+  if (fs::exists(path)) {
     auto config_file =
-        std::fstream(config_path, std::fstream::in | std::fstream::binary);
-    config_file >> config_data;
+        std::fstream(path, std::fstream::in | std::fstream::binary);
+    config_file >> data;
   }
 
-  return Config(config_data);
+  return Config(data);
 }
 
 static fs::path data_path(Date date) {
@@ -139,7 +135,7 @@ static void save_data(const ActivityMatcher& matcher, Date date) {
 #define WM_USER_SHELLICON WM_USER + 1
 
 // Global Variables:
-// TODO: find a way to get rid of it
+// TODO: use SetProp/GetProp instead
 NOTIFYICONDATA nidApp;
 
 static std::atomic<bool> paused = false;
@@ -150,9 +146,9 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
   POINT lpClickPoint;
   HMENU hPopMenu;
 
-  // static const uint32_t menu_item_id = IDM_EXIT;
   static const uint32_t menu_exit_id = 1337;
   static const uint32_t menu_pause_id = 1338;
+  static const uint32_t append = 0xFFFFFFFF;
 
   switch (message) {
     case WM_USER_SHELLICON:
@@ -162,9 +158,9 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           UINT uFlag = MF_BYPOSITION | MF_STRING;
           GetCursorPos(&lpClickPoint);
           hPopMenu = CreatePopupMenu();
-          InsertMenu(hPopMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING,
+          InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_pause_id, paused ? L"Resume" : L"Pause");
-          InsertMenu(hPopMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING,
+          InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_exit_id, L"Exit");
           SetForegroundWindow(hWnd);
           TrackPopupMenu(hPopMenu,
@@ -198,7 +194,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
   return 0;
 }
 
-static void init_win32(HINSTANCE instance) {
+static void init_systray(HINSTANCE instance) {
   static const wchar_t* title = L"trackme";
   static const wchar_t* class_name = L"trackme_systray";
 
@@ -267,36 +263,27 @@ int WINAPI WinMain(_In_ HINSTANCE instance,
                    _In_opt_ HINSTANCE /*hPrevInstance*/,
                    _In_ LPSTR /*lpCmdLine*/, _In_ int /*nCmdShow*/
 ) {
-  init_win32(instance);
+  init_systray(instance);
   init_notifications();
 
   Date today = current_date();
   auto matcher = load_data(today);
-  auto config = get_config();
+  auto config = load_config();
 
   if (!matcher) {
     matcher = std::move(config.matcher);
   }
 
   Executor executor;
-  executor.spawn_periodic(Seconds(1), [&matcher, max_period = config.max_idle_time] {
-    auto window = current_active_window();
-    if (!window.empty() && !paused) {
-      if (idle_time() < max_period) {
-        track(*matcher, window, Seconds(1));
-      }
-#ifdef _DEBUG
-      else {
-        OutputDebugStringW(L"USER IS NOT HERE\n");
-      }
-#endif
-    }
-  });
-
-  executor.spawn_periodic(Seconds(10), [&matcher] {
-    const auto json = matcher->to_json().dump(4);
-    std::cout << json << std::endl;
-  });
+  executor.spawn_periodic(
+      Seconds(1), [&matcher, max_idle = config.max_idle_time] {
+        static const std::string_view idle_activity = "idle";
+        const auto window = current_active_window();
+        if (!paused) {
+          const bool is_idle = window.empty() || idle_time() > max_idle;
+          track(*matcher, is_idle ? idle_activity : window, Seconds(1));
+        }
+      });
 
   const auto tomorrow = round_up<Days>(Clock::now());
   executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1),
