@@ -12,6 +12,8 @@ add_executable(
   unicode.cpp
   matcher.hpp
   matcher.cpp
+  activity.hpp
+  activity.cpp
 )
 
 target_compile_definitions(
@@ -20,6 +22,7 @@ target_compile_definitions(
   PUBLIC UNICODE
   PUBLIC _UNICODE
   PUBLIC _CRT_SECURE_NO_WARNINGS
+  PUBLIC NOMINMAX
 )
 
 target_link_libraries(

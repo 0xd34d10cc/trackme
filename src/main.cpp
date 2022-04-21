@@ -2,65 +2,27 @@
 #include "executor.hpp"
 #include "matcher.hpp"
 #include "notification.hpp"
-#include "unicode.hpp"
+#include "activity.hpp"
 
-#define NOMINMAX
 #include <windows.h>
-#include <winuser.h>
-#include <psapi.h>
 #include <strsafe.h>
 
-#include <array>
 #include <atomic>
-#include <chrono>
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <iostream>
 #include <thread>
 #include <utility>
 
+
 namespace fs = std::filesystem;
 
-static Duration idle_time() {
-  LASTINPUTINFO last_input;
-  last_input.cbSize = sizeof(LASTINPUTINFO);
-  if (!GetLastInputInfo(&last_input)) {
-    assert(false);
-    return Duration();
-  }
-
-  const auto now = GetTickCount();
-  const auto elapsed = now - last_input.dwTime;
-  return elapsed > 0 ? Milliseconds(elapsed) : Duration();
-}
-
 static std::string current_active_window() {
-  HWND window_handle = GetForegroundWindow();
-  if (!window_handle) {
-    return std::string{};
+  const auto activity = Activity::current();
+  if (!activity.title.empty()) {
+    return activity.title;
   }
-
-  static const int title_size = 256;
-  std::array<wchar_t, title_size> title;
-  int n = GetWindowTextW(window_handle, title.data(), title_size);
-  if (n == 0) {
-    DWORD process_id = 0;
-    GetWindowThreadProcessId(window_handle, &process_id);
-    HANDLE process_handle =
-        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
-    if (process_handle) {
-      n = GetProcessImageFileNameW(process_handle, title.data(), title_size);
-      CloseHandle(process_handle);
-    }
-  }
-
-#ifdef _DEBUG
-  OutputDebugStringW(title.data());
-  OutputDebugStringW(L"\n");
-#endif
-
-  return utf8_encode(title.data(), n);
+  return activity.executable;
 }
 
 static bool track(ActivityMatcher& matcher, std::string_view activity,
