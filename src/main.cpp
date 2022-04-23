@@ -162,7 +162,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           ofn.hwndOwner = hWnd;
           ofn.lpstrFile = szFile;
           ofn.nMaxFile = sizeof(szFile);
-          ofn.lpstrFilter = L"All\0*.*\CSV\0*.CSV\0";
+          ofn.lpstrFilter = L"All\0*.*\0CSV\0*.CSV\0";
           ofn.nFilterIndex = 1;
           ofn.lpstrFileTitle = NULL;
           ofn.nMaxFileTitle = 0;
