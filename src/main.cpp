@@ -222,10 +222,7 @@ static void run_win32_event_loop() {
   }
 }
 
-int WINAPI WinMain(_In_ HINSTANCE instance,
-                   _In_opt_ HINSTANCE /*hPrevInstance*/,
-                   _In_ LPSTR /*lpCmdLine*/, _In_ int /*nCmdShow*/
-) {
+static void run(HINSTANCE instance) {
   init_systray(instance);
   init_notifications();
 
@@ -261,9 +258,27 @@ int WINAPI WinMain(_In_ HINSTANCE instance,
     executor.run();
     log.flush();
   });
-
-  run_win32_event_loop();
+  try {
+    run_win32_event_loop();
+  } catch (...) {
+    tracker_thread.detach();
+    throw;
+  }
   executor.stop();
   tracker_thread.join();
+}
+
+int WINAPI WinMain(_In_ HINSTANCE instance,
+                   _In_opt_ HINSTANCE /*hPrevInstance*/,
+                   _In_ LPSTR /*lpCmdLine*/, _In_ int /*nCmdShow*/
+) {
+  try {
+    run(instance);
+  }
+  catch (const std::exception& e) {
+    MessageBoxA(NULL, e.what(), "Error",
+                MB_ICONERROR | MB_OK);
+    return EXIT_FAILURE;
+  }
   return EXIT_SUCCESS;
 }
