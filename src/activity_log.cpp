@@ -20,8 +20,8 @@ void ActivityLog::track(Activity activity, TimePoint time) {
     return;
   }
 
+  m_current->active_time.end = time;
   if (activity == m_current->activity) {
-    m_current->active_time.end = time;
     return;
   }
 
