@@ -4,6 +4,7 @@
 #include "activity_log.hpp"
 #include "notification.hpp"
 #include "activity.hpp"
+#include "unicode.hpp"
 
 #include <windows.h>
 #include <strsafe.h>
@@ -111,6 +112,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
 
   static const uint32_t menu_exit_id = 1337;
   static const uint32_t menu_pause_id = 1338;
+  static const uint32_t menu_report = 1339;
   static const uint32_t append = 0xFFFFFFFF;
 
   switch (message) {
@@ -123,6 +125,8 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           hPopMenu = CreatePopupMenu();
           InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_pause_id, paused ? L"Resume" : L"Pause");
+          InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING, menu_report,
+                     L"Report");
           InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_exit_id, L"Exit");
           SetForegroundWindow(hWnd);
@@ -144,6 +148,36 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
         case menu_pause_id:
           paused = !paused;
           break;
+        case menu_report: {
+          const wchar_t* filename = NULL;
+          const auto _dir = trackme_dir().string();
+          const auto dir = utf8_decode(_dir.data(), _dir.size());
+
+          OPENFILENAME ofn;         // common dialog box structure
+          TCHAR szFile[260] = {0};  // if using TCHAR macros
+
+          // Initialize OPENFILENAME
+          ZeroMemory(&ofn, sizeof(ofn));
+          ofn.lStructSize = sizeof(ofn);
+          ofn.hwndOwner = hWnd;
+          ofn.lpstrFile = szFile;
+          ofn.nMaxFile = sizeof(szFile);
+          ofn.lpstrFilter = L"All\0*.*\CSV\0*.CSV\0";
+          ofn.nFilterIndex = 1;
+          ofn.lpstrFileTitle = NULL;
+          ofn.nMaxFileTitle = 0;
+          ofn.lpstrInitialDir = dir.c_str();
+          ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+          if (GetOpenFileName(&ofn) == TRUE) {
+            // use ofn.lpstrFile
+            filename = ofn.lpstrFile;
+            // TODO: generate report in html and open in default browser,
+            //       see https://developers.google.com/chart/interactive/docs/gallery/timeline
+            OutputDebugStringW(filename);
+          }
+          break;
+        }
         default:
           return DefWindowProc(hWnd, message, wParam, lParam);
       }
