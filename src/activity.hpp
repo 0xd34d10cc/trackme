@@ -14,6 +14,8 @@ struct Activity {
   ProcessID pid;
   std::string executable;
   std::string title;
+
+  auto operator<=>(const Activity&) const = default;
 };
 
 Duration idle_time();

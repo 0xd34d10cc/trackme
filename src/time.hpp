@@ -18,6 +18,11 @@ using Days = std::chrono::days;
 using Months = std::chrono::months;
 using Years = std::chrono::years;
 
+struct TimeRange {
+  TimePoint begin;
+  TimePoint end;
+};
+
 template <typename Dur>
 auto round_down(TimePoint time) {
 	return std::chrono::floor<Dur>(time);

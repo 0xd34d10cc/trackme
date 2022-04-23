@@ -1,6 +1,7 @@
 #include "config.hpp"
 #include "executor.hpp"
 #include "matcher.hpp"
+#include "activity_log.hpp"
 #include "notification.hpp"
 #include "activity.hpp"
 
@@ -72,7 +73,7 @@ static fs::path data_path(Date date) {
   }
 
   const auto name =
-      std::format("{}-{}-{}.json", date.day(), date.month(), date.year());
+      std::format("{}-{}-{}.csv", date.day(), date.month(), date.year());
   return dir / name;
 }
 
@@ -229,38 +230,36 @@ int WINAPI WinMain(_In_ HINSTANCE instance,
   init_notifications();
 
   Date today = current_date();
-  auto matcher = load_data(today);
+  auto log = ActivityLog::open(data_path(today));
+  // TODO: integrate matcher with activity log
+  // auto matcher = load_data(today);
   auto config = load_config();
 
-  if (!matcher) {
-    matcher = std::move(config.matcher);
-  }
-
   Executor executor;
-  executor.spawn_periodic(
-      Seconds(1), [&matcher, max_idle = config.max_idle_time] {
-        static const std::string_view idle_activity = "idle";
-        const auto window = current_active_window();
-        if (!paused) {
-          const bool is_idle = window.empty() || idle_time() > max_idle;
-          track(*matcher, is_idle ? idle_activity : window, Seconds(1));
-        }
-      });
+  executor.spawn_periodic(Seconds(1), [&log, max_idle = config.max_idle_time] {
+    static const Activity idle_activity = {
+        .pid = 0, .executable = "idle", .title = "doing nothing"};
+
+    if (!paused) {
+      const auto now = Clock::now();
+      if (idle_time() > max_idle) {
+        log.track(idle_activity, now);
+      } else {
+        log.track(Activity::current(), now);
+      }
+    }
+  });
 
   const auto tomorrow = round_up<Days>(Clock::now());
-  executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1),
-                             [&matcher, &today] {
-                               save_data(*matcher, today);
-                               today = current_date();
-                               matcher->clear();
-                             });
+  executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1), [&log, &today] {
+    log.flush();
+    today = current_date();
+    log = ActivityLog::open(data_path(today));
+  });
 
-  executor.spawn_periodic(config.dump_data_period,
-                          [&matcher, &today] { save_data(*matcher, today); });
-
-  auto tracker_thread = std::thread([&executor, &matcher, &today] {
+  auto tracker_thread = std::thread([&executor, &log, &today] {
     executor.run();
-    save_data(*matcher, today);
+    log.flush();
   });
 
   run_win32_event_loop();
