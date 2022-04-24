@@ -5,22 +5,21 @@
 #include <psapi.h>
 #include <winuser.h>
 
-#include <array>
-#include <cassert>
-
 
 Activity Activity::current() {
   Activity activity{};
 
   HWND window_handle = GetForegroundWindow();
   if (!window_handle) {
+    activity.executable = "unknown";
+    activity.title = "unknown";
     return activity;
   }
 
-  static const int buffer_size = 256;
-  std::array<wchar_t, buffer_size> buffer;
-  int n = GetWindowTextW(window_handle, buffer.data(), buffer_size);
-  activity.title = utf8_encode(buffer.data(), n);
+  static const int buffer_size = 512;
+  wchar_t buffer[buffer_size];
+  int n = GetWindowTextW(window_handle, buffer, buffer_size);
+  activity.title = utf8_encode(buffer, n);
 
   DWORD process_id = 0;
   GetWindowThreadProcessId(window_handle, &process_id);
@@ -30,9 +29,9 @@ Activity Activity::current() {
       OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
 
   if (process_handle) {
-    n = GetProcessImageFileNameW(process_handle, buffer.data(), buffer_size);
+    n = GetProcessImageFileNameW(process_handle, buffer, buffer_size);
     CloseHandle(process_handle);
-    activity.executable = utf8_encode(buffer.data(), n);
+    activity.executable = utf8_encode(buffer, n);
   }
 
   return activity;
@@ -42,7 +41,6 @@ Duration idle_time() {
   LASTINPUTINFO last_input;
   last_input.cbSize = sizeof(LASTINPUTINFO);
   if (!GetLastInputInfo(&last_input)) {
-    assert(false);
     return Duration();
   }
 

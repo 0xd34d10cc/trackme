@@ -14,7 +14,11 @@ add_executable(
   matcher.cpp
   activity.hpp
   activity.cpp
- "activity_log.hpp" "activity_log.cpp")
+  activity_log.hpp
+  activity_log.cpp
+  activity_reader.hpp
+  activity_reader.cpp
+)
 
 target_compile_definitions(
   trackme

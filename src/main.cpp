@@ -150,14 +150,13 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           break;
         case menu_report: {
           const wchar_t* filename = NULL;
-          const auto _dir = trackme_dir().string();
-          const auto dir = utf8_decode(_dir.data(), _dir.size());
+          const auto dir = utf8_decode(trackme_dir().string());
 
           OPENFILENAME ofn;         // common dialog box structure
-          TCHAR szFile[260] = {0};  // if using TCHAR macros
+          wchar_t szFile[512] = {0};  // if using TCHAR macros
 
           // Initialize OPENFILENAME
-          ZeroMemory(&ofn, sizeof(ofn));
+          std::memset(&ofn, 0, sizeof(ofn));
           ofn.lStructSize = sizeof(ofn);
           ofn.hwndOwner = hWnd;
           ofn.lpstrFile = szFile;
@@ -169,7 +168,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           ofn.lpstrInitialDir = dir.c_str();
           ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-          if (GetOpenFileName(&ofn) == TRUE) {
+          if (GetOpenFileNameW(&ofn) == TRUE) {
             // use ofn.lpstrFile
             filename = ofn.lpstrFile;
             // TODO: generate report in html and open in default browser,
@@ -262,6 +261,16 @@ static void run(HINSTANCE instance) {
 
   Date today = current_date();
   auto log = ActivityLog::open(data_path(today));
+  {
+    auto reader = log.reader();
+    int i = 0;
+    ActivityEntry entry;
+    while (i < 10 && reader.read(entry)) {
+      ++i;
+      OutputDebugStringA(entry.executable.c_str());
+    }
+  }
+
   // TODO: integrate matcher with activity log
   // auto matcher = load_data(today);
   auto config = load_config();

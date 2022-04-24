@@ -2,16 +2,12 @@
 
 #include "time.hpp"
 #include "activity.hpp"
+#include "activity_reader.hpp"
 
 #include <fstream>
 #include <optional>
 #include <filesystem>
 
-
-struct ActivityEntry {
-  Activity activity;
-  TimeRange active_time;
-};
 
 class ActivityLog {
  public:
@@ -19,6 +15,8 @@ class ActivityLog {
 
   void track(Activity activity, TimePoint time);
   void flush();
+
+  ActivityReader reader();
 
  private:
   ActivityLog(std::fstream file, std::optional<Activity> current);

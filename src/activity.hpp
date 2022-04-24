@@ -18,4 +18,6 @@ struct Activity {
   auto operator<=>(const Activity&) const = default;
 };
 
+struct ActivityEntry : Activity, TimeRange {};
+
 Duration idle_time();
