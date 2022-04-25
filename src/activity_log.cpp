@@ -4,6 +4,13 @@ ActivityLog::ActivityLog(std::fstream file, std::optional<Activity> activity)
     : m_file(std::move(file)), m_current(std::move(activity)) {}
 
 ActivityLog ActivityLog::open(const std::filesystem::path& path) {
+  if (!std::filesystem::exists(path)) {
+    std::fstream create(path, std::ios::out);
+    if (!create.is_open()) {
+      throw std::runtime_error("Failed to create activity log file");
+    }
+  }
+
   const auto flags = std::ios::out | std::ios::in | std::ios::binary;
   std::fstream file(path, flags);
   if (!file.is_open()) {

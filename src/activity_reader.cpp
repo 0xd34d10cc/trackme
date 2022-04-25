@@ -61,6 +61,10 @@ static bool parse_activity(std::string_view line, ActivityEntry& activity) {
   activity.end = parse_time(next());
   activity.pid = parse_pid(next());
   activity.executable = next();
+  if (line.find(',') != std::string_view::npos) {
+    throw std::runtime_error("Invalid file format: too many fields");
+  }
+
   activity.title = strip(line);
   return true;
 }
