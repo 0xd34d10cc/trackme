@@ -22,7 +22,6 @@ class ActivityLog {
   ActivityLog(std::fstream file, std::optional<Activity> current);
   void write_entry(const ActivityEntry& entry);
 
-
   std::fstream m_file;
   std::optional<ActivityEntry> m_current;
 };

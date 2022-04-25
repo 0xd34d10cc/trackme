@@ -19,31 +19,6 @@
 
 namespace fs = std::filesystem;
 
-static std::string current_active_window() {
-  const auto activity = Activity::current();
-  if (!activity.title.empty()) {
-    return activity.title;
-  }
-  return activity.executable;
-}
-
-static bool track(ActivityMatcher& matcher, std::string_view activity,
-                  Duration time_active) {
-  auto* stats = matcher.match(activity);
-  if (!stats) {
-    return false;
-  }
-
-  const bool limit_exceeded = stats->active > stats->limit;
-  stats->active += time_active;
-
-  if (!limit_exceeded && stats->active > stats->limit) {
-    show_notification(std::string(activity) + " - time's up");
-  }
-
-  return true;
-}
-
 static fs::path trackme_dir() {
   if (const char* home = std::getenv("HOME")) {
     return fs::path(home) / "trackme";
@@ -76,24 +51,6 @@ static fs::path data_path(Date date) {
   const auto name =
       std::format("{}-{}-{}.csv", date.day(), date.month(), date.year());
   return dir / name;
-}
-
-static std::unique_ptr<ActivityMatcher> load_data(Date date) {
-  auto path = data_path(date);
-  if (!fs::exists(path)) {
-    return nullptr;
-  }
-
-  auto file = std::fstream(path, std::fstream::in | std::fstream::binary);
-  Json data;
-  file >> data;
-  return parse_matcher(data);
-}
-
-static void save_data(const ActivityMatcher& matcher, Date date) {
-  auto file =
-      std::fstream(data_path(date), std::fstream::out | std::fstream::binary);
-  file << matcher.to_json().dump(4) << std::flush;
 }
 
 #define WM_USER_SHELLICON WM_USER + 1
