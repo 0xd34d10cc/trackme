@@ -1,4 +1,3 @@
-#include "config.hpp"
 #include "executor.hpp"
 #include "matcher.hpp"
 #include "activity_log.hpp"
@@ -29,6 +28,24 @@ static fs::path trackme_dir() {
   }
 }
 
+struct Config {
+  static Config parse(const Json& data) {
+    Config config;
+    config.max_idle_time = parse_humantime(data.value("max_idle_time", "2m"));
+
+    if (data.contains("matcher")) {
+      config.matcher = parse_matcher(data["matcher"]);
+    } else {
+      config.matcher = std::make_unique<AnyGroupMatcher>();
+    }
+
+    return config;
+  }
+
+  Duration max_idle_time;
+  std::unique_ptr<ActivityMatcher> matcher;
+};
+
 static Config load_config() {
   Json data = Json::object();
   const auto path = trackme_dir() / "config.json";
@@ -39,13 +56,13 @@ static Config load_config() {
     config_file >> data;
   }
 
-  return Config(data);
+  return Config::parse(data);
 }
 
 static fs::path data_path(Date date) {
   const auto dir = trackme_dir();
   if (!fs::exists(dir) && !fs::create_directories(dir)) {
-    std::abort();
+    throw std::runtime_error("Failed to create trackme dir");
   }
 
   const auto name =
@@ -118,7 +135,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           ofn.hwndOwner = hWnd;
           ofn.lpstrFile = szFile;
           ofn.nMaxFile = sizeof(szFile);
-          ofn.lpstrFilter = L"All\0*.*\0CSV\0*.CSV\0";
+          ofn.lpstrFilter = L"All\0*.*\0csv\0*.CSV\0";
           ofn.nFilterIndex = 1;
           ofn.lpstrFileTitle = NULL;
           ofn.nMaxFileTitle = 0;
@@ -175,17 +192,16 @@ static void init_systray(HINSTANCE instance) {
                    CW_USEDEFAULT, 0, NULL, NULL, instance, NULL);
 
   if (!hWnd) {
-    abort();
+    throw std::runtime_error("Failed to create window");
   }
 
-  nidApp.cbSize = sizeof(NOTIFYICONDATA);  // sizeof the struct in bytes
-  nidApp.hWnd =
-      (HWND)hWnd;  // handle of the window which will process this app. messages
-  nidApp.uID = 32512;  // ID of the icon that willl appear in the system tray
-  nidApp.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;  // ORing of all the flags
-  nidApp.hIcon =
-      LoadIcon(NULL, IDI_APPLICATION);  // handle of the Icon to be displayed,
-                                        // obtained from LoadIcon
+  nidApp.cbSize = sizeof(NOTIFYICONDATA);
+  nidApp.hWnd = (HWND)hWnd;
+  // ID of the icon that willl appear in the system tray
+  nidApp.uID = 32512; // IDI_APPLICATION
+  nidApp.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+  nidApp.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+
   nidApp.uCallbackMessage = WM_USER_SHELLICON;
   StringCchCopyW(nidApp.szTip, sizeof(nidApp.szTip) / sizeof(nidApp.szTip[0]),
                  title);
@@ -237,13 +253,15 @@ static void run(HINSTANCE instance) {
     static const Activity idle_activity = {
         .pid = 0, .executable = "idle", .title = "doing nothing"};
 
-    if (!paused) {
-      const auto now = Clock::now();
-      if (idle_time() > max_idle) {
-        log.track(idle_activity, now);
-      } else {
-        log.track(Activity::current(), now);
-      }
+    if (paused) {
+      return;
+    }
+
+    const auto now = Clock::now();
+    if (idle_time() > max_idle) {
+      log.track(idle_activity, now);
+    } else {
+      log.track(Activity::current(), now);
     }
   });
 
@@ -261,7 +279,8 @@ static void run(HINSTANCE instance) {
   try {
     run_win32_event_loop();
   } catch (...) {
-    tracker_thread.detach();
+    executor.stop();
+    tracker_thread.join();
     throw;
   }
   executor.stop();
@@ -276,7 +295,7 @@ int WINAPI WinMain(_In_ HINSTANCE instance,
     run(instance);
   }
   catch (const std::exception& e) {
-    MessageBoxA(NULL, e.what(), "Error",
+    MessageBoxA(NULL, e.what(), "trackme - error",
                 MB_ICONERROR | MB_OK);
     return EXIT_FAILURE;
   }
