@@ -38,7 +38,7 @@ struct Config {
     if (data.contains("matcher")) {
       config.matcher = parse_matcher(data["matcher"]);
     } else {
-      config.matcher = std::make_unique<AnyGroupMatcher>();
+      config.matcher = std::make_unique<NoneMatcher>();
     }
 
     return config;
