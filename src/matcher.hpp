@@ -1,10 +1,10 @@
 #pragma once
 
 #include "time.hpp"
+#include "activity.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <unordered_map>
 #include <vector>
 #include <memory>
 #include <regex>
@@ -21,14 +21,12 @@ struct Stats {
   }
 
   void clear();
-  Json to_json() const;
   static Stats parse(const Json& data);
 };
 
 class ActivityMatcher {
 public:
-  // returns nullptr if *name* doesn't match any "known" activities
-  virtual Stats* match(std::string_view name) = 0;
+  virtual Stats* match(const Activity& activity) = 0;
   virtual void clear() = 0;
   virtual ~ActivityMatcher();
 };
@@ -39,7 +37,7 @@ class NoneMatcher : public ActivityMatcher {
   NoneMatcher() = default;
   ~NoneMatcher() override;
 
-  Stats* match(std::string_view name) override;
+  Stats* match(const Activity& activity) override;
   void clear() override;
 };
 
@@ -49,7 +47,7 @@ public:
   ListMatcher(std::vector<std::unique_ptr<ActivityMatcher>> matchers);
   ~ListMatcher() override;
 
-  Stats* match(std::string_view name) override;
+  Stats* match(const Activity& activity) override;
   void clear() override;
 
   static std::unique_ptr<ListMatcher> parse(const Json& data);
@@ -58,19 +56,25 @@ private:
   std::vector<std::unique_ptr<ActivityMatcher>> m_matchers;
 };
 
+enum class ActivityField {
+  Title,
+  Executable
+};
+
 // matches activity via regex
 class RegexMatcher: public ActivityMatcher {
 public:
-  RegexMatcher(std::string re);
+  RegexMatcher(std::string re, ActivityField field);
   ~RegexMatcher() override;
 
-  Stats* match(std::string_view name) override;
+  Stats* match(const Activity& activity) override;
   void clear() override;
 
   static std::unique_ptr<RegexMatcher> parse(const Json& data);
 
 private:
   std::regex m_re;
+  ActivityField m_field;
   std::string m_expr;
   Stats m_stats;
 };
