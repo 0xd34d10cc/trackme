@@ -15,3 +15,5 @@ void Limiter::track(const Activity& activity, Duration time) {
     }
   }
 }
+
+void Limiter::reset() { m_matcher->clear(); }

@@ -270,9 +270,10 @@ static void run(HINSTANCE instance) {
   });
 
   const auto tomorrow = round_up<Days>(Clock::now());
-  executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1), [&log] {
+  executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1), [&log, &limiter] {
     log.flush();
     log = ActivityLog::open(data_path(current_date()));
+    limiter.reset();
   });
 
   auto tracker_thread = std::thread([&executor, &log] {
