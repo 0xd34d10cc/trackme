@@ -255,6 +255,7 @@ static void run(HINSTANCE instance) {
         .pid = 0, .executable = "idle", .title = "doing nothing"};
 
     if (paused) {
+      log.flush();
       return;
     }
 
