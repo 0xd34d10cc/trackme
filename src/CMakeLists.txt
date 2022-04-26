@@ -18,6 +18,8 @@ add_executable(
   activity_log.cpp
   activity_reader.hpp
   activity_reader.cpp
+  limiter.hpp
+  limiter.cpp
 )
 
 target_compile_definitions(

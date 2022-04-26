@@ -9,7 +9,7 @@
 class ActivityReader {
  public:
   ActivityReader(std::istream& stream);
-  ~ActivityReader();
+  ~ActivityReader() = default;
 
   bool read(ActivityEntry& activity);
 

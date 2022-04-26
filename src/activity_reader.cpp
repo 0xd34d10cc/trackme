@@ -5,10 +5,6 @@
 
 ActivityReader::ActivityReader(std::istream& stream) : m_stream(stream) {}
 
-ActivityReader::~ActivityReader() {
-  m_stream.seekg(0, std::istream::end);
-}
-
 static bool is_space(char c) {
   return c == ' ' || c == '\r' || c == '\n' || c == '\t';
 }
@@ -61,9 +57,10 @@ static bool parse_activity(std::string_view line, ActivityEntry& activity) {
   activity.end = parse_time(next());
   activity.pid = parse_pid(next());
   activity.executable = next();
-  if (line.find(',') != std::string_view::npos) {
-    throw std::runtime_error("Invalid file format: too many fields");
-  }
+  // FIXME: needs utf-8 aware string to be correct
+  // if (line.find(',') != std::string_view::npos) {
+  //  throw std::runtime_error("Invalid file format: too many fields");
+  // }
 
   activity.title = strip(line);
   return true;

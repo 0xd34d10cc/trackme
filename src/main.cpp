@@ -1,9 +1,11 @@
 #include "executor.hpp"
 #include "matcher.hpp"
 #include "activity_log.hpp"
+#include "activity_reader.hpp"
 #include "notification.hpp"
 #include "activity.hpp"
 #include "unicode.hpp"
+#include "limiter.hpp"
 
 #include <windows.h>
 #include <strsafe.h>
@@ -228,28 +230,27 @@ static void run_win32_event_loop() {
   }
 }
 
+static void track_activities(Limiter& limiter, const fs::path& path) {
+  auto file = std::fstream{path, std::fstream::in | std::fstream::binary};
+  ActivityReader reader{file};
+  ActivityEntry entry;
+  while (reader.read(entry)) {
+    limiter.track(entry, entry.end - entry.begin);
+  }
+}
+
 static void run(HINSTANCE instance) {
   init_systray(instance);
   init_notifications();
 
-  Date today = current_date();
-  auto log = ActivityLog::open(data_path(today));
-  {
-    auto reader = log.reader();
-    int i = 0;
-    ActivityEntry entry;
-    while (i < 10 && reader.read(entry)) {
-      ++i;
-      OutputDebugStringA(entry.executable.c_str());
-    }
-  }
-
-  // TODO: integrate matcher with activity log
-  // auto matcher = load_data(today);
+  const auto path = data_path(current_date());
   auto config = load_config();
+  auto limiter = Limiter{std::move(config.matcher)};
+  track_activities(limiter, path);
+  auto log = ActivityLog::open(path);
 
   Executor executor;
-  executor.spawn_periodic(Seconds(1), [&log, max_idle = config.max_idle_time] {
+  executor.spawn_periodic(Seconds(1), [&log, &limiter, max_idle = config.max_idle_time] {
     static const Activity idle_activity = {
         .pid = 0, .executable = "idle", .title = "doing nothing"};
 
@@ -261,21 +262,30 @@ static void run(HINSTANCE instance) {
     if (idle_time() > max_idle) {
       log.track(idle_activity, now);
     } else {
-      log.track(Activity::current(), now);
+      auto activity = Activity::current();
+      // TODO: use prev_now - now instead
+      limiter.track(activity, Seconds(1));
+      log.track(std::move(activity), now);
     }
   });
 
   const auto tomorrow = round_up<Days>(Clock::now());
-  executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1), [&log, &today] {
+  executor.spawn_periodic_at(tomorrow + Seconds(1), Days(1), [&log] {
     log.flush();
-    today = current_date();
-    log = ActivityLog::open(data_path(today));
+    log = ActivityLog::open(data_path(current_date()));
   });
 
-  auto tracker_thread = std::thread([&executor, &log, &today] {
-    executor.run();
-    log.flush();
+  auto tracker_thread = std::thread([&executor, &log] {
+    try {
+      executor.run();
+      log.flush();
+    } catch (const std::exception& e) {
+      // FIXME: propagate exception to the main thread
+      OutputDebugStringA(e.what());
+      std::abort();
+    }
   });
+
   try {
     run_win32_event_loop();
   } catch (...) {

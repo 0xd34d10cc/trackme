@@ -40,8 +40,7 @@ void init_notifications() {
   toast->setAppName(L"trackme");
   toast->setAppUserModelId(L"trackme example");
   if (!toast->initialize()) {
-    std::cerr << "Failed to initialize wintoast" << std::endl;
-    std::exit(-1);
+    throw std::runtime_error("Failed to initialize wintoast");
   }
 }
 
