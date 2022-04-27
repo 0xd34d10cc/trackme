@@ -43,5 +43,6 @@ void ActivityLog::write_entry(const ActivityEntry& entry) {
                   entry.executable, entry.title);
 
   m_file.write(serialized.data(), serialized.size());
-  m_file.flush();
+  // TODO: flush only complete csv lines so file is always valid
+  // m_file.flush();
 }
