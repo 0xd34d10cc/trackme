@@ -5,14 +5,15 @@
 #include <psapi.h>
 #include <winuser.h>
 
+bool Activity::valid() const {
+  return pid != 0 && !executable.empty();
+}
 
 Activity Activity::current() {
   Activity activity{};
 
   HWND window_handle = GetForegroundWindow();
   if (!window_handle) {
-    activity.executable = "unknown";
-    activity.title = "unknown";
     return activity;
   }
 

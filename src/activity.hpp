@@ -10,8 +10,9 @@ using ProcessID = uint64_t;
 
 struct Activity {
   static Activity current();
+  bool valid() const;
 
-  ProcessID pid;
+  ProcessID pid{ 0 };
   std::string executable;
   std::string title;
 

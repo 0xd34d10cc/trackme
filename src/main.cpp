@@ -288,7 +288,7 @@ static void run(HINSTANCE instance) {
   Executor executor;
   executor.spawn_periodic(Seconds(1), [&log, &limiter, max_idle = config.max_idle_time] {
     static const Activity idle_activity = {
-        .pid = 0, .executable = "idle", .title = "doing nothing"};
+        .pid = 0, .executable = "idle", .title = "afk"};
 
     if (paused) {
       log.flush();
@@ -300,6 +300,10 @@ static void run(HINSTANCE instance) {
       log.track(idle_activity, now);
     } else {
       auto activity = Activity::current();
+      if (!activity.valid()) {
+        return;
+      }
+
       // TODO: use prev_now - now instead
       limiter.track(activity, Seconds(1));
       log.track(std::move(activity), now);
