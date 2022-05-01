@@ -35,6 +35,7 @@ void ActivityLog::flush() {
 
   write_entry(*m_current);
   m_current.reset();
+  m_file.flush();
 }
 
 void ActivityLog::write_entry(const ActivityEntry& entry) {

@@ -20,7 +20,8 @@ add_executable(
   activity_reader.cpp
   limiter.hpp
   limiter.cpp
-  visualizer.hpp
+  reporter.hpp
+  reporter.cpp
 )
 
 target_compile_definitions(

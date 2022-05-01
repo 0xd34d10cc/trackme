@@ -6,7 +6,7 @@
 #include "activity.hpp"
 #include "unicode.hpp"
 #include "limiter.hpp"
-#include "visualizer.hpp"
+#include "reporter.hpp"
 
 #include <windows.h>
 #include <strsafe.h>
@@ -73,22 +73,22 @@ static fs::path data_path(Date date) {
   return dir / name;
 }
 
-static void report_activities(const fs::path& csv_path,
+static void report_activities(const fs::path& activities_path,
                               const fs::path& report_path) {
-  auto file = std::fstream{csv_path, std::fstream::in | std::fstream::binary};
-  auto report =
+  auto activities_file =
+      std::fstream{activities_path, std::fstream::in | std::fstream::binary};
+  auto report_file =
       std::fstream(report_path, std::fstream::out | std::fstream::binary);
 
-  ActivityReader reader{file};
-  TimelineVisualizer visualizer(report);
+  ActivityReader reader{activities_file};
+  Reporter reporter{report_file};
   ActivityEntry entry;
-
   while (reader.read(entry)) {
-    visualizer.add_activity(entry);
+    reporter.add(entry);
   }
 }
 
-static void show_report(const fs::path& report_path) {
+static bool show_report(const fs::path& report_path) {
   int result = 0;
   TCHAR app[MAX_PATH] = {0};
   auto data = report_path.generic_wstring();
@@ -99,7 +99,10 @@ static void show_report(const fs::path& report_path) {
   if (result > 32) {
     ::ShellExecute(0, NULL, app, data.c_str(), NULL,
                    SW_SHOWNORMAL);
+    return true;
   }
+
+  return false;
 }
 
 
