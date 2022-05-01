@@ -6,6 +6,7 @@
 #include "activity.hpp"
 #include "unicode.hpp"
 #include "limiter.hpp"
+#include "visualizer.hpp"
 
 #include <windows.h>
 #include <strsafe.h>
@@ -71,6 +72,22 @@ static fs::path data_path(Date date) {
       std::format("{}-{}-{}.csv", date.day(), date.month(), date.year());
   return dir / name;
 }
+
+static void report_activities(const fs::path& csv_path,
+                              const fs::path& report_path) {
+  auto file = std::fstream{csv_path, std::fstream::in | std::fstream::binary};
+  auto report =
+      std::fstream(report_path, std::fstream::out | std::fstream::binary);
+
+  ActivityReader reader{file};
+  TimelineVisualizer visualizer(report);
+  ActivityEntry entry;
+
+  while (reader.read(entry)) {
+    visualizer.add_activity(entry);
+  }
+}
+
 
 #define WM_USER_SHELLICON WM_USER + 1
 
@@ -147,6 +164,8 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           if (GetOpenFileNameW(&ofn) == TRUE) {
             // use ofn.lpstrFile
             filename = ofn.lpstrFile;
+            report_activities(utf8_encode(filename),
+                              trackme_dir() / "report.html");
             // TODO: generate report in html and open in default browser,
             //       see https://developers.google.com/chart/interactive/docs/gallery/timeline
             OutputDebugStringW(filename);
@@ -238,6 +257,7 @@ static void track_activities(Limiter& limiter, const fs::path& path) {
     limiter.track(entry, entry.end - entry.begin);
   }
 }
+
 
 static void run(HINSTANCE instance) {
   init_systray(instance);
