@@ -3,9 +3,9 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
-#include <iostream>
 
-constexpr std::string_view TEMPLATE_START = R"(<html>
+
+constexpr std::string_view TEMPLATE_BEGIN = R"(<html>
   <head>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="text/javascript">
@@ -22,10 +22,6 @@ constexpr std::string_view TEMPLATE_START = R"(<html>
         dataTable.addRows([
 )";
 
-constexpr std::string_view TEMPLATE_FIELD =
-    "[ '{}', new Date({}, {}, {}, {}, {}, {}), new Date({}, {}, {}, {}, {}, "
-    "{}) ],\n";
-
 constexpr std::string_view TEMPLATE_END = R"(])
 
         chart.draw(dataTable);
@@ -38,9 +34,8 @@ constexpr std::string_view TEMPLATE_END = R"(])
 </html>
 )";
 
-
 Reporter::Reporter(std::ostream& stream) : m_stream(stream) {
-  m_stream << TEMPLATE_START;
+  m_stream << TEMPLATE_BEGIN;
 }
 
 Reporter::~Reporter() {
@@ -49,12 +44,6 @@ Reporter::~Reporter() {
 }
 
 void Reporter::add(const ActivityEntry& activity) {
-  auto curr_day = round_down<Days>(activity.begin);
-  auto begin = std::chrono::hh_mm_ss(activity.begin - curr_day);
-  auto end = std::chrono::hh_mm_ss(activity.end - curr_day);
-  auto curr_date = Date(curr_day);
-
-  // TODO: refactor this
   const auto js_escape = [](std::string_view s) {
     std::string out;
     for (char c : s) {
@@ -68,13 +57,26 @@ void Reporter::add(const ActivityEntry& activity) {
     return out;
   };
 
+  const auto write_datetime = [](std::ostream& stream, TimePoint time) {
+    const auto day_start = round_down<Days>(time);
+    const auto date = Date(day_start);
+    const auto time_of_day = TimeOfDay(time - day_start);
+
+    stream << "new Date(" << static_cast<int>(date.year()) << ", "
+           << static_cast<unsigned>(date.month()) << ", "
+           << static_cast<unsigned>(date.day()) << ",";
+
+    stream << time_of_day.hours().count() << ", "
+           << time_of_day.minutes().count() << ", "
+           << time_of_day.seconds().count() << ")";
+  };
+
   const auto exe_filename =
       std::filesystem::path(activity.executable).filename().string();
-  m_stream << std::format(
-      TEMPLATE_FIELD, js_escape(exe_filename), int(curr_date.year()),
-      unsigned int(curr_date.month()), unsigned int(curr_date.day()),
-      begin.hours().count(), begin.minutes().count(), begin.seconds().count(),
-      int(curr_date.year()), unsigned int(curr_date.month()),
-      unsigned int(curr_date.day()), end.hours().count(), end.minutes().count(),
-      end.seconds().count());
+
+  m_stream << "['" << js_escape(exe_filename) << "', ";
+  write_datetime(m_stream, activity.begin);
+  m_stream << ", ";
+  write_datetime(m_stream, activity.end);
+  m_stream << "],\n";
 }

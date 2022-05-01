@@ -9,6 +9,7 @@ using Clock = std::chrono::system_clock;
 using TimePoint = Clock::time_point;
 using Duration = Clock::duration;
 using Date = std::chrono::year_month_day;
+using TimeOfDay = std::chrono::hh_mm_ss<Duration>;
 
 using Milliseconds = std::chrono::milliseconds;
 using Seconds = std::chrono::seconds;
