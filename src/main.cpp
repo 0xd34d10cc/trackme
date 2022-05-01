@@ -88,6 +88,20 @@ static void report_activities(const fs::path& csv_path,
   }
 }
 
+static void show_report(const fs::path& report_path) {
+  int result = 0;
+  TCHAR app[MAX_PATH] = {0};
+  auto data = report_path.generic_wstring();
+
+  result = (int)::FindExecutableW(data.c_str(), NULL, app);
+
+  data = L"file:///" + report_path.generic_wstring();
+  if (result > 32) {
+    ::ShellExecute(0, NULL, app, data.c_str(), NULL,
+                   SW_SHOWNORMAL);
+  }
+}
+
 
 #define WM_USER_SHELLICON WM_USER + 1
 
@@ -166,9 +180,8 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
             filename = ofn.lpstrFile;
             report_activities(utf8_encode(filename),
                               trackme_dir() / "report.html");
-            // TODO: generate report in html and open in default browser,
-            //       see https://developers.google.com/chart/interactive/docs/gallery/timeline
-            OutputDebugStringW(filename);
+
+            show_report(trackme_dir() / "report.html");
           }
           break;
         }
