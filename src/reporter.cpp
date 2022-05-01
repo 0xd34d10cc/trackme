@@ -16,6 +16,7 @@ constexpr std::string_view TEMPLATE_BEGIN = R"(<html>
         var chart = new google.visualization.Timeline(container);
         var dataTable = new google.visualization.DataTable();
 
+        dataTable.addColumn({ type: 'string', id: 'Executable' });
         dataTable.addColumn({ type: 'string', id: 'Title' });
         dataTable.addColumn({ type: 'date', id: 'Start' });
         dataTable.addColumn({ type: 'date', id: 'End' });
@@ -75,6 +76,7 @@ void Reporter::add(const ActivityEntry& activity) {
       std::filesystem::path(activity.executable).filename().string();
 
   m_stream << "['" << js_escape(exe_filename) << "', ";
+  m_stream << "'" << js_escape(activity.title) << "', ";
   write_datetime(m_stream, activity.begin);
   m_stream << ", ";
   write_datetime(m_stream, activity.end);
