@@ -24,8 +24,11 @@ constexpr std::string_view TEMPLATE_BEGIN = R"(<html>
 )";
 
 constexpr std::string_view TEMPLATE_END = R"(])
+        var options = {
+          timeline: { colorByRowLabel: true }
+        };
 
-        chart.draw(dataTable);
+        chart.draw(dataTable, options);
       }
     </script>
   </head>
