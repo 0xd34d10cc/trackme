@@ -12,23 +12,12 @@
 
 using Json = nlohmann::json;
 
-struct Stats {
-  Duration active{ Seconds(0) };
-  Duration limit{ Duration::max() };
-
-  bool has_limit() const noexcept {
-    return limit != Duration::max();
-  }
-
-  void clear();
-  static Stats parse(const Json& data);
-};
+using GroupID = std::string;
 
 class ActivityMatcher {
 public:
   // TODO: decouple matcher from Stats
-  virtual Stats* match(const Activity& activity) = 0;
-  virtual void clear() = 0;
+  virtual GroupID match(const Activity& activity) = 0;
   virtual ~ActivityMatcher();
 };
 
@@ -38,8 +27,7 @@ class NoneMatcher : public ActivityMatcher {
   NoneMatcher() = default;
   ~NoneMatcher() override;
 
-  Stats* match(const Activity& activity) override;
-  void clear() override;
+  GroupID match(const Activity& activity) override;
 };
 
 // goes through a list of matchers and returns first that can find a match
@@ -48,8 +36,7 @@ public:
   ListMatcher(std::vector<std::unique_ptr<ActivityMatcher>> matchers);
   ~ListMatcher() override;
 
-  Stats* match(const Activity& activity) override;
-  void clear() override;
+  GroupID match(const Activity& activity) override;
 
   static std::unique_ptr<ListMatcher> parse(const Json& data);
 
@@ -65,19 +52,18 @@ enum class ActivityField {
 // matches activity via regex
 class RegexMatcher: public ActivityMatcher {
 public:
-  RegexMatcher(std::string re, ActivityField field);
+  RegexMatcher(GroupID id, std::string re, ActivityField field);
   ~RegexMatcher() override;
 
-  Stats* match(const Activity& activity) override;
-  void clear() override;
+  GroupID match(const Activity& activity) override;
 
   static std::unique_ptr<RegexMatcher> parse(const Json& data);
 
 private:
+  GroupID m_id;
   std::regex m_re;
   ActivityField m_field;
   std::string m_expr;
-  Stats m_stats;
 };
 
 // factory function for above

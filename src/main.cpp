@@ -36,17 +36,15 @@ struct Config {
     Config config;
     config.max_idle_time = parse_humantime(data.value("max_idle_time", "2m"));
 
-    if (data.contains("matcher")) {
-      config.matcher = parse_matcher(data["matcher"]);
-    } else {
-      config.matcher = std::make_unique<NoneMatcher>();
+    if (data.contains("limiter")) {
+      config.limiter = Limiter::parse(data["limiter"]);
     }
 
     return config;
   }
 
   Duration max_idle_time;
-  std::unique_ptr<ActivityMatcher> matcher;
+  Limiter limiter;
 };
 
 static Config load_config() {
@@ -280,6 +278,7 @@ static void track_activities(Limiter& limiter, const fs::path& path) {
   ActivityReader reader{file};
   ActivityEntry entry;
   while (reader.read(entry)) {
+    // TODO: don't show any notifications while processing old events
     limiter.track(entry, entry.end - entry.begin);
   }
 }
@@ -291,7 +290,7 @@ static void run(HINSTANCE instance) {
 
   const auto path = data_path(current_date());
   auto config = load_config();
-  auto limiter = Limiter{std::move(config.matcher)};
+  auto& limiter = config.limiter;
   track_activities(limiter, path);
   auto log = ActivityLog::open(path);
 

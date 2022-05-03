@@ -1,31 +1,11 @@
 #include "matcher.hpp"
 
 
-void Stats::clear() {
-  active = Duration{};
-}
-
-Stats Stats::parse(const Json& data) {
-  Stats stats{};
-
-  if (data.contains("active")) {
-    stats.active = parse_humantime(data["active"].get<std::string>());
-  }
-
-  if (data.contains("limit")) {
-    stats.limit = parse_humantime(data["limit"].get<std::string>());
-  }
-
-  return stats;
-}
-
 ActivityMatcher::~ActivityMatcher() {}
 
 NoneMatcher::~NoneMatcher() {}
 
-Stats* NoneMatcher::match(const Activity& activity) { return nullptr; }
-
-void NoneMatcher::clear() {}
+GroupID NoneMatcher::match(const Activity& activity) { return {}; }
 
 ListMatcher::ListMatcher(std::vector<std::unique_ptr<ActivityMatcher>> matchers)
   : m_matchers(std::move(matchers))
@@ -33,20 +13,15 @@ ListMatcher::ListMatcher(std::vector<std::unique_ptr<ActivityMatcher>> matchers)
 
 ListMatcher::~ListMatcher() {}
 
-Stats* ListMatcher::match(const Activity& activity) {
+GroupID ListMatcher::match(const Activity& activity) {
   for (auto& matcher : m_matchers) {
-    if (auto* stats = matcher->match(activity)) {
-      return stats;
+    auto id = matcher->match(activity);
+    if (!id.empty()) {
+      return id;
     }
   }
 
-  return nullptr;
-}
-
-void ListMatcher::clear() {
-  for (auto& matcher : m_matchers) {
-    matcher->clear();
-  }
+  return {};
 }
 
 std::unique_ptr<ListMatcher> ListMatcher::parse(const Json& data) {
@@ -65,8 +40,8 @@ std::unique_ptr<ListMatcher> ListMatcher::parse(const Json& data) {
   return std::make_unique<ListMatcher>(std::move(matchers));
 }
 
-RegexMatcher::RegexMatcher(std::string re, ActivityField field)
-    : m_re(re), m_field(field), m_expr(std::move(re)) {
+RegexMatcher::RegexMatcher(GroupID id, std::string re, ActivityField field)
+    : m_id(std::move(id)), m_re(re), m_field(field), m_expr(std::move(re)) {
   if (m_re.mark_count() != 0) {
     throw std::runtime_error("Expected no groups in regex");
   }
@@ -74,17 +49,13 @@ RegexMatcher::RegexMatcher(std::string re, ActivityField field)
 
 RegexMatcher::~RegexMatcher() {}
 
-Stats* RegexMatcher::match(const Activity& activity) {
+GroupID RegexMatcher::match(const Activity& activity) {
   const auto& field = m_field == ActivityField::Title ? activity.title : activity.executable;
   if (std::regex_match(field.data(), field.data() + field.size(), m_re)) {
-    return &m_stats;
+    return m_id;
   }
 
-  return nullptr;
-}
-
-void RegexMatcher::clear() {
-  m_stats.clear();
+  return {};
 }
 
 std::unique_ptr<RegexMatcher> RegexMatcher::parse(const Json& data) {
@@ -105,12 +76,9 @@ std::unique_ptr<RegexMatcher> RegexMatcher::parse(const Json& data) {
     }
   }
 
-  const auto re = data["re"].get<std::string>();
-  auto matcher = std::make_unique<RegexMatcher>(std::move(re), field);
-  if (data.contains("stats")) {
-    matcher->m_stats = Stats::parse(data["stats"]);
-  }
-
+  auto id = data["id"].get<std::string>();
+  auto re = data["re"].get<std::string>();
+  auto matcher = std::make_unique<RegexMatcher>(std::move(id), std::move(re), field);
   return matcher;
 }
 
