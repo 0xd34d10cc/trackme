@@ -109,6 +109,16 @@ static bool show_report(const fs::path& report_path) {
 NOTIFYICONDATA nidApp;
 
 static std::atomic<bool> paused = false;
+static std::atomic<const std::exception*> global_exception = nullptr;
+
+static bool set_global_exception(const std::exception* e) {
+  const std::exception* expected = nullptr;
+  return global_exception.compare_exchange_strong(expected, e);
+}
+
+static const std::exception* get_global_exception() {
+  return global_exception.load();
+}
 
 LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
                                    LPARAM lParam) {
@@ -244,6 +254,10 @@ static void init_systray(HINSTANCE instance) {
 static void run_win32_event_loop() {
   bool running = true;
   while (running) {
+    if (const auto* e = get_global_exception()) {
+      throw *e;
+    }
+
     const int timeout_ms = 100;
     if (MsgWaitForMultipleObjects(0, NULL, FALSE, (int)timeout_ms,
                                   QS_ALLINPUT) == WAIT_OBJECT_0) {
@@ -318,9 +332,12 @@ static void run(HINSTANCE instance) {
       executor.run();
       log.flush();
     } catch (const std::exception& e) {
-      // FIXME: propagate exception to the main thread
-      OutputDebugStringA(e.what());
-      std::abort();
+      auto global_exception = std::make_unique<std::runtime_error>(e.what());
+      if (set_global_exception(global_exception.get())) {
+        global_exception.release();
+      }
+
+      log.flush();
     }
   });
 
