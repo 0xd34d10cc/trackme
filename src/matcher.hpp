@@ -26,6 +26,7 @@ struct Stats {
 
 class ActivityMatcher {
 public:
+  // TODO: decouple matcher from Stats
   virtual Stats* match(const Activity& activity) = 0;
   virtual void clear() = 0;
   virtual ~ActivityMatcher();

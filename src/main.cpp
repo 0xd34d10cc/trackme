@@ -89,16 +89,12 @@ static void report_activities(const fs::path& activities_path,
 }
 
 static bool show_report(const fs::path& report_path) {
-  int result = 0;
-  TCHAR app[MAX_PATH] = {0};
+  wchar_t app[512];
   auto data = report_path.generic_wstring();
-
-  result = (int)::FindExecutableW(data.c_str(), NULL, app);
-
-  data = L"file:///" + report_path.generic_wstring();
-  if (result > 32) {
-    ::ShellExecute(0, NULL, app, data.c_str(), NULL,
-                   SW_SHOWNORMAL);
+  int status = reinterpret_cast<int>(FindExecutableW(data.c_str(), NULL, app));
+  if (status > 32) {
+    data = L"file:///" + data;
+    ShellExecuteW(0, NULL, app, data.c_str(), NULL, SW_SHOWNORMAL);
     return true;
   }
 
