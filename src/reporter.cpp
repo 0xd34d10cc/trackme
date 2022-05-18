@@ -25,7 +25,10 @@ constexpr std::string_view TEMPLATE_BEGIN = R"(<html>
 
 constexpr std::string_view TEMPLATE_END = R"(])
         var options = {
-          timeline: { colorByRowLabel: true }
+          timeline: { colorByRowLabel: true },
+          hAxis: {
+            format: 'dd/MM HH:MM'
+          },
         };
 
         chart.draw(dataTable, options);

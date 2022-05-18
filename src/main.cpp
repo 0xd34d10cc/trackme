@@ -71,18 +71,21 @@ static fs::path data_path(Date date) {
   return dir / name;
 }
 
-static void report_activities(const fs::path& activities_path,
+static void report_activities(const std::vector<fs::path> files,
                               const fs::path& report_path) {
-  auto activities_file =
-      std::fstream{activities_path, std::fstream::in | std::fstream::binary};
   auto report_file =
       std::fstream(report_path, std::fstream::out | std::fstream::binary);
-
-  ActivityReader reader{activities_file};
   Reporter reporter{report_file};
-  ActivityEntry entry;
-  while (reader.read(entry)) {
-    reporter.add(entry);
+
+  for (auto& activities_path : files) {
+    auto activities_file =
+        std::fstream{activities_path, std::fstream::in | std::fstream::binary};
+
+    ActivityReader reader{activities_file};
+    ActivityEntry entry;
+    while (reader.read(entry)) {
+      reporter.add(entry);
+    }
   }
 }
 
@@ -180,14 +183,29 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           ofn.lpstrFileTitle = NULL;
           ofn.nMaxFileTitle = 0;
           ofn.lpstrInitialDir = dir.c_str();
-          ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+          ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST |
+                      OFN_ALLOWMULTISELECT | OFN_EXPLORER;
 
           if (GetOpenFileNameW(&ofn) == TRUE) {
-            // use ofn.lpstrFile
             filename = ofn.lpstrFile;
-            report_activities(utf8_encode(filename),
-                              trackme_dir() / "report.html");
 
+            std::vector<fs::path> files;
+            std::size_t len = lstrlenW(filename);
+            if (ofn.nFileOffset > len) {
+              // several files selected
+              const auto dir = fs::path(utf8_encode(filename));
+              const wchar_t* p = filename + len + 1;
+              len = lstrlenW(p);
+              while (len != 0) {
+                files.emplace_back(dir / utf8_encode(p, len));
+                p += len + 1;
+                len = lstrlenW(p);
+              }
+            } else {
+              files.emplace_back(utf8_encode(filename));
+            }
+
+            report_activities(files, trackme_dir() / "report.html");
             show_report(trackme_dir() / "report.html");
           }
           break;
