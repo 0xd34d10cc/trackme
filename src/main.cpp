@@ -81,7 +81,7 @@ static void report_activities(const std::vector<fs::path> files,
     auto activities_file =
         std::fstream{activities_path, std::fstream::in | std::fstream::binary};
 
-    ActivityReader reader{activities_file};
+    ActivityReader reader{activities_file, activities_path.string()};
     ActivityEntry entry;
     while (reader.read(entry)) {
       reporter.add(entry);
@@ -179,7 +179,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           ofn.lpstrFile = szFile;
           ofn.nMaxFile = sizeof(szFile);
           ofn.lpstrFilter = L"All\0*.*\0csv\0*.CSV\0";
-          ofn.nFilterIndex = 1;
+          ofn.nFilterIndex = 2; // NOTE: filters are indexed from 1
           ofn.lpstrFileTitle = NULL;
           ofn.nMaxFileTitle = 0;
           ofn.lpstrInitialDir = dir.c_str();
@@ -205,8 +205,13 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
               files.emplace_back(utf8_encode(filename));
             }
 
-            report_activities(files, trackme_dir() / "report.html");
-            show_report(trackme_dir() / "report.html");
+            try {
+              report_activities(files, trackme_dir() / "report.html");
+              show_report(trackme_dir() / "report.html");
+            } catch (const std::exception& e) {
+              MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
+                          MB_ICONERROR | MB_OK);
+            }
           }
           break;
         }
@@ -293,7 +298,7 @@ static void run_win32_event_loop() {
 
 static void track_activities(Limiter& limiter, const fs::path& path) {
   auto file = std::fstream{path, std::fstream::in | std::fstream::binary};
-  ActivityReader reader{file};
+  ActivityReader reader{file, path.string()};
   ActivityEntry entry;
   while (reader.read(entry)) {
     // TODO: don't show any notifications while processing old events

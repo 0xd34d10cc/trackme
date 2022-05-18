@@ -1,9 +1,11 @@
 #include "activity_reader.hpp"
 
 #include <charconv>
+#include <format>
 
 
-ActivityReader::ActivityReader(std::istream& stream) : m_stream(stream) {}
+ActivityReader::ActivityReader(std::istream& stream, std::string filename)
+    : m_stream(stream), m_filename(std::move(filename)) {}
 
 static bool is_space(char c) {
   return c == ' ' || c == '\r' || c == '\n' || c == '\t';
@@ -21,31 +23,31 @@ static std::string_view strip(std::string_view s) {
   return s;
 }
 
-static TimePoint parse_time(std::string_view s) {
+TimePoint ActivityReader::parse_time(std::string_view s) {
   std::stringstream ss{std::string(s)};
   TimePoint t;
   // 2022-04-23 11:09:12.3345685
   if (!std::chrono::from_stream(ss, "%F %T", t)) {
-    throw std::runtime_error("Invalid file format: failed to parse time");
+    fail("failed to parse time");
   }
   return t;
 }
 
-static ProcessID parse_pid(std::string_view s) {
+ProcessID ActivityReader::parse_pid(std::string_view s) {
   ProcessID id = 0;
   const auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), id);
   if (ec != std::errc() || end != s.data() + s.size()) {
-    throw std::runtime_error("Invalid file format: failed to parse pid");
+    fail("failed to parse pid");
   }
   return id;
 }
 
-static bool parse_activity(std::string_view line, ActivityEntry& activity) {
+bool ActivityReader::parse_activity(std::string_view line, ActivityEntry& activity) {
   const auto next = [&] {
     line = strip(line);
     size_t i = line.find(',');
     if (i == std::string_view::npos) {
-      throw std::runtime_error("Invalid file format: not enough fields");
+      fail("not enough fields");
     }
 
     const auto field = line.substr(0, i);
@@ -66,6 +68,15 @@ static bool parse_activity(std::string_view line, ActivityEntry& activity) {
   return true;
 }
 
+void ActivityReader::fail(std::string_view message) {
+  throw std::runtime_error(
+      std::format("{}:{} - {}", m_filename, m_line_number, message));
+}
+
 bool ActivityReader::read(ActivityEntry& activity) {
-  return std::getline(m_stream, m_line) && parse_activity(m_line, activity);
+  bool success = std::getline(m_stream, m_line) && parse_activity(m_line, activity);
+  if (success) {
+    ++m_line_number;
+  }
+  return success;
 }
