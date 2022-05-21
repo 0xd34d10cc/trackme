@@ -71,11 +71,29 @@ static fs::path data_path(Date date) {
   return dir / name;
 }
 
-static void report_activities(const std::vector<fs::path> files,
+static void report_timeline(const std::vector<fs::path> files,
                               const fs::path& report_path) {
   auto report_file =
       std::fstream(report_path, std::fstream::out | std::fstream::binary);
-  Reporter reporter{report_file};
+  TimeLineReporter reporter{report_file};
+
+  for (auto& activities_path : files) {
+    auto activities_file =
+        std::fstream{activities_path, std::fstream::in | std::fstream::binary};
+
+    ActivityReader reader{activities_file, activities_path.string()};
+    ActivityEntry entry;
+    while (reader.read(entry)) {
+      reporter.add(entry);
+    }
+  }
+}
+
+static void report_pie(const std::vector<fs::path> files,
+  const fs::path& report_path) {
+  auto report_file =
+      std::fstream(report_path, std::fstream::out | std::fstream::binary);
+  PieReporter reporter{report_file};
 
   for (auto& activities_path : files) {
     auto activities_file =
@@ -121,6 +139,50 @@ static const std::exception* get_global_exception() {
   return global_exception.load();
 }
 
+static std::vector<fs::path> get_filepathes(HWND hWnd) {
+  const wchar_t* filename = NULL;
+  const auto dir = utf8_decode(trackme_dir().string());
+
+  OPENFILENAME ofn;           // common dialog box structure
+  wchar_t szFile[512] = {0};  // if using TCHAR macros
+
+  // Initialize OPENFILENAME
+  std::memset(&ofn, 0, sizeof(ofn));
+  ofn.lStructSize = sizeof(ofn);
+  ofn.hwndOwner = hWnd;
+  ofn.lpstrFile = szFile;
+  ofn.nMaxFile = sizeof(szFile);
+  ofn.lpstrFilter = L"All\0*.*\0csv\0*.CSV\0";
+  ofn.nFilterIndex = 2;  // NOTE: filters are indexed from 1
+  ofn.lpstrFileTitle = NULL;
+  ofn.nMaxFileTitle = 0;
+  ofn.lpstrInitialDir = dir.c_str();
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT |
+              OFN_EXPLORER;
+
+  std::vector<fs::path> files;
+
+  if (GetOpenFileNameW(&ofn) == TRUE) {
+    filename = ofn.lpstrFile;
+
+    std::size_t len = lstrlenW(filename);
+    if (ofn.nFileOffset > len) {
+      // several files selected
+      const auto dir = fs::path(utf8_encode(filename));
+      const wchar_t* p = filename + len + 1;
+      len = lstrlenW(p);
+      while (len != 0) {
+        files.emplace_back(dir / utf8_encode(p, len));
+        p += len + 1;
+        len = lstrlenW(p);
+      }
+    } else {
+      files.emplace_back(utf8_encode(filename));
+    }
+  }
+  return files;
+}
+
 LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
                                    LPARAM lParam) {
   int wmId, wmEvent;
@@ -129,7 +191,8 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
 
   static const uint32_t menu_exit_id = 1337;
   static const uint32_t menu_pause_id = 1338;
-  static const uint32_t menu_report = 1339;
+  static const uint32_t menu_timeline_report = 1339;
+  static const uint32_t menu_pie_report = 1340;
   static const uint32_t append = 0xFFFFFFFF;
 
   switch (message) {
@@ -142,8 +205,10 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           hPopMenu = CreatePopupMenu();
           InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_pause_id, paused ? L"Resume" : L"Pause");
-          InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING, menu_report,
-                     L"Report");
+          InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING, menu_timeline_report,
+                     L"Report timeline");
+          InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
+                     menu_pie_report, L"Report pie");
           InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_exit_id, L"Exit");
           SetForegroundWindow(hWnd);
@@ -165,48 +230,24 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
         case menu_pause_id:
           paused = !paused;
           break;
-        case menu_report: {
-          const wchar_t* filename = NULL;
-          const auto dir = utf8_decode(trackme_dir().string());
-
-          OPENFILENAME ofn;         // common dialog box structure
-          wchar_t szFile[512] = {0};  // if using TCHAR macros
-
-          // Initialize OPENFILENAME
-          std::memset(&ofn, 0, sizeof(ofn));
-          ofn.lStructSize = sizeof(ofn);
-          ofn.hwndOwner = hWnd;
-          ofn.lpstrFile = szFile;
-          ofn.nMaxFile = sizeof(szFile);
-          ofn.lpstrFilter = L"All\0*.*\0csv\0*.CSV\0";
-          ofn.nFilterIndex = 2; // NOTE: filters are indexed from 1
-          ofn.lpstrFileTitle = NULL;
-          ofn.nMaxFileTitle = 0;
-          ofn.lpstrInitialDir = dir.c_str();
-          ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST |
-                      OFN_ALLOWMULTISELECT | OFN_EXPLORER;
-
-          if (GetOpenFileNameW(&ofn) == TRUE) {
-            filename = ofn.lpstrFile;
-
-            std::vector<fs::path> files;
-            std::size_t len = lstrlenW(filename);
-            if (ofn.nFileOffset > len) {
-              // several files selected
-              const auto dir = fs::path(utf8_encode(filename));
-              const wchar_t* p = filename + len + 1;
-              len = lstrlenW(p);
-              while (len != 0) {
-                files.emplace_back(dir / utf8_encode(p, len));
-                p += len + 1;
-                len = lstrlenW(p);
-              }
-            } else {
-              files.emplace_back(utf8_encode(filename));
-            }
-
+        case menu_timeline_report: {
+          const auto files = get_filepathes(hWnd);
+          if (!files.empty()) {
             try {
-              report_activities(files, trackme_dir() / "report.html");
+              report_timeline(files, trackme_dir() / "report.html");
+              show_report(trackme_dir() / "report.html");
+            } catch (const std::exception& e) {
+              MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
+                          MB_ICONERROR | MB_OK);
+            }
+          }
+          break;
+        }
+        case menu_pie_report: {
+          const auto files = get_filepathes(hWnd);
+          if (!files.empty()) {
+            try {
+              report_pie(files, trackme_dir() / "report.html");
               show_report(trackme_dir() / "report.html");
             } catch (const std::exception& e) {
               MessageBoxA(NULL, e.what(), "trackme - failed to generate report",

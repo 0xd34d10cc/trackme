@@ -5,7 +5,7 @@
 #include <string_view>
 
 
-constexpr std::string_view TEMPLATE_BEGIN = R"(<html>
+constexpr std::string_view TIMELINE_TEMPLATE_BEGIN = R"(<html>
   <head>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="text/javascript">
@@ -23,7 +23,7 @@ constexpr std::string_view TEMPLATE_BEGIN = R"(<html>
         dataTable.addRows([
 )";
 
-constexpr std::string_view TEMPLATE_END = R"(])
+constexpr std::string_view TIMELINE_TEMPLATE_END = R"(])
         var options = {
           timeline: { colorByRowLabel: true },
           hAxis: {
@@ -41,16 +41,29 @@ constexpr std::string_view TEMPLATE_END = R"(])
 </html>
 )";
 
-Reporter::Reporter(std::ostream& stream) : m_stream(stream) {
-  m_stream << TEMPLATE_BEGIN;
+static std::string js_escape(std::string_view s) {
+  std::string out;
+  for (char c : s) {
+    if (c == '\'' || c == '\\') {
+      out.push_back('\\');
+    }
+
+    out.push_back(c);
+  }
+
+  return out;
 }
 
-Reporter::~Reporter() {
-  m_stream << TEMPLATE_END;
+TimeLineReporter::TimeLineReporter(std::ostream& stream) : m_stream(stream) {
+  m_stream << TIMELINE_TEMPLATE_BEGIN;
+}
+
+TimeLineReporter::~TimeLineReporter() {
+  m_stream << TIMELINE_TEMPLATE_END;
   m_stream.flush();
 }
 
-void Reporter::add(const ActivityEntry& activity) {
+void TimeLineReporter::add(const ActivityEntry& activity) {
   const auto js_escape = [](std::string_view s) {
     std::string out;
     for (char c : s) {
@@ -87,4 +100,55 @@ void Reporter::add(const ActivityEntry& activity) {
   m_stream << ", ";
   write_datetime(m_stream, activity.end);
   m_stream << "],\n";
+}
+
+
+constexpr std::string_view PIE_TEMPLATE_BEGIN = R"(
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load("current", {packages:["corechart"]});
+      google.charts.setOnLoadCallback(drawChart);
+      function drawChart() {
+        var data = google.visualization.arrayToDataTable([
+          ['Activity', 'Minutes'],
+)";
+
+constexpr std::string_view PIE_TEMPLATE_END = R"(
+]);
+        var options = {
+          title: 'My Activities',
+          pieHole: 0.4,
+        };
+
+        var chart = new google.visualization.PieChart(document.getElementById('donutchart'));
+        chart.draw(data, options);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="donutchart" style="width: 900px; height: 500px;"></div>
+  </body>
+</html>
+)";
+
+PieReporter::PieReporter(std::ostream& stream) : m_stream(stream) {
+  m_stream << PIE_TEMPLATE_BEGIN;
+}
+
+void PieReporter::add(const ActivityEntry& activity) {
+  const auto short_name =
+      std::filesystem::path(activity.executable).filename().string();
+  m_activityAggr[short_name] += activity.end - activity.begin;
+}
+
+PieReporter::~PieReporter() {
+  for (const auto& [activity, duration] : m_activityAggr) {
+    m_stream << std::format("['{}', {}], \n", js_escape(activity),
+                            std::chrono::duration_cast<Minutes>(duration).count());
+  }
+
+  m_stream << PIE_TEMPLATE_END;
+  m_stream.flush();
 }

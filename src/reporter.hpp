@@ -2,16 +2,29 @@
 
 #include "activity.hpp"
 
+#include <unordered_map>
 #include <iosfwd>
 
 
-class Reporter {
+class TimeLineReporter {
  public:
-  Reporter(std::ostream& stream);
-  ~Reporter();
+  TimeLineReporter(std::ostream& stream);
+  ~TimeLineReporter();
 
   void add(const ActivityEntry& activity);
 
  private:
   std::ostream& m_stream;
+};
+
+class PieReporter {
+ public:
+  PieReporter(std::ostream& stream);
+  ~PieReporter();
+
+  void add(const ActivityEntry& activity);
+
+ private:
+  std::ostream& m_stream;
+  std::unordered_map<std::string, Duration> m_activityAggr;
 };
