@@ -117,14 +117,14 @@ constexpr std::string_view PIE_TEMPLATE_BEGIN = R"(
 
 constexpr std::string_view PIE_TEMPLATE_END = R"(
 ]);
-        var options = {
-          title: 'My Activities',
+        var options = {{
+          title: 'My Activities. Total: {} minutes',
           pieHole: 0.4,
-        };
+        }};
 
         var chart = new google.visualization.PieChart(document.getElementById('donutchart'));
         chart.draw(data, options);
-      }
+      }}
     </script>
   </head>
   <body>
@@ -144,11 +144,16 @@ void PieReporter::add(const ActivityEntry& activity) {
 }
 
 PieReporter::~PieReporter() {
+  std::size_t total_minutes = 0;
+
   for (const auto& [activity, duration] : m_activityAggr) {
-    m_stream << std::format("['{}', {}], \n", js_escape(activity),
-                            std::chrono::duration_cast<Minutes>(duration).count());
+    // TODO: avoid losing seconds because of flooring duration
+    auto duration_minutes =
+        std::chrono::duration_cast<Minutes>(duration).count();
+    m_stream << std::format("['{}', {}], \n", js_escape(activity), duration_minutes);
+    total_minutes += duration_minutes;
   }
 
-  m_stream << PIE_TEMPLATE_END;
+  m_stream << std::format(PIE_TEMPLATE_END, total_minutes);
   m_stream.flush();
 }
