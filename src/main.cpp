@@ -17,6 +17,7 @@
 #include <fstream>
 #include <thread>
 #include <utility>
+#include <system_error>
 
 
 namespace fs = std::filesystem;
@@ -140,35 +141,34 @@ static const std::exception* get_global_exception() {
 }
 
 static std::vector<fs::path> get_filepathes(HWND hWnd) {
-  const wchar_t* filename = NULL;
   const auto dir = utf8_decode(trackme_dir().string());
 
-  OPENFILENAME ofn;           // common dialog box structure
-  wchar_t szFile[512] = {0};  // if using TCHAR macros
+  static const std::size_t MAX_CHARACTERS = 4096;
+  OPENFILENAME options;
+  wchar_t buffer[MAX_CHARACTERS+1]; // +1 for null
+  buffer[0] = 0;
 
-  // Initialize OPENFILENAME
-  std::memset(&ofn, 0, sizeof(ofn));
-  ofn.lStructSize = sizeof(ofn);
-  ofn.hwndOwner = hWnd;
-  ofn.lpstrFile = szFile;
-  ofn.nMaxFile = sizeof(szFile);
-  ofn.lpstrFilter = L"All\0*.*\0csv\0*.CSV\0";
-  ofn.nFilterIndex = 2;  // NOTE: filters are indexed from 1
-  ofn.lpstrFileTitle = NULL;
-  ofn.nMaxFileTitle = 0;
-  ofn.lpstrInitialDir = dir.c_str();
-  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT |
-              OFN_EXPLORER;
+  std::memset(&options, 0, sizeof(options));
+  options.lStructSize = sizeof(options);
+  options.hwndOwner = hWnd;
+  options.lpstrFile = buffer;
+  options.nMaxFile = MAX_CHARACTERS;
+  options.lpstrFilter = L"All\0*.*\0csv\0*.CSV\0";
+  options.nFilterIndex = 2;  // NOTE: filters are indexed from 1
+  options.lpstrFileTitle = NULL;
+  options.nMaxFileTitle = 0;
+  options.lpstrInitialDir = dir.c_str();
+  options.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT |
+                  OFN_EXPLORER;
 
   std::vector<fs::path> files;
 
-  if (GetOpenFileNameW(&ofn) == TRUE) {
-    filename = ofn.lpstrFile;
-
+  const wchar_t* filename = options.lpstrFile;
+  if (GetOpenFileNameW(&options) == TRUE) {
     std::size_t len = lstrlenW(filename);
-    if (ofn.nFileOffset > len) {
+    if (options.nFileOffset > len) {
       // several files selected
-      const auto dir = fs::path(utf8_encode(filename));
+      const auto dir = fs::path(utf8_encode(filename, len));
       const wchar_t* p = filename + len + 1;
       len = lstrlenW(p);
       while (len != 0) {
@@ -179,7 +179,13 @@ static std::vector<fs::path> get_filepathes(HWND hWnd) {
     } else {
       files.emplace_back(utf8_encode(filename));
     }
+  } else {
+    const auto ec = CommDlgExtendedError();
+    if (ec) {
+      throw std::runtime_error(std::format("Failed to open file dialogue. Error code 0x{:x}", ec));
+    }
   }
+
   return files;
 }
 
@@ -231,28 +237,28 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           paused = !paused;
           break;
         case menu_timeline_report: {
-          const auto files = get_filepathes(hWnd);
-          if (!files.empty()) {
-            try {
+          try {
+            const auto files = get_filepathes(hWnd);
+            if (!files.empty()) {
               report_timeline(files, trackme_dir() / "report.html");
               show_report(trackme_dir() / "report.html");
-            } catch (const std::exception& e) {
-              MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
-                          MB_ICONERROR | MB_OK);
             }
+          } catch (const std::exception& e) {
+            MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
+                        MB_ICONERROR | MB_OK);
           }
           break;
         }
         case menu_pie_report: {
-          const auto files = get_filepathes(hWnd);
-          if (!files.empty()) {
-            try {
+          try {
+            const auto files = get_filepathes(hWnd);
+            if (!files.empty()) {
               report_pie(files, trackme_dir() / "report.html");
               show_report(trackme_dir() / "report.html");
-            } catch (const std::exception& e) {
-              MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
-                          MB_ICONERROR | MB_OK);
             }
+          } catch (const std::exception& e) {
+            MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
+                        MB_ICONERROR | MB_OK);
           }
           break;
         }
