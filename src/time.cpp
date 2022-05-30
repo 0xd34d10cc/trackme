@@ -5,10 +5,10 @@
 #include <stdexcept>
 
 
-std::string to_humantime(Duration d) {
+std::string to_humantime(Duration d, std::string_view delimiter) {
   std::string buffer;
 
-  auto add = [&buffer, &d](Duration period, std::string_view suffix) {
+  auto add = [&buffer, &d, delimiter](Duration period, std::string_view suffix) {
     const auto n = d / period;
     if (n == 0) {
       return;
@@ -19,6 +19,7 @@ std::string to_humantime(Duration d) {
     buffer.reserve(buffer.size() + (num_end - num.data()) + suffix.size());
     buffer.append(num.data(), num_end);
     buffer.append(suffix);
+    buffer.append(delimiter);
     d -= n * period;
   };
 
@@ -29,6 +30,8 @@ std::string to_humantime(Duration d) {
 
   if (buffer.empty()) {
     buffer = "0s";
+  } else {
+    buffer.resize(buffer.size() - delimiter.size());
   }
 
   return buffer;

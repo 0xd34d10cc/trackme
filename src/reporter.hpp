@@ -26,5 +26,6 @@ class PieReporter {
 
  private:
   std::ostream& m_stream;
-  std::unordered_map<std::string, Duration> m_activityAggr;
+  Duration m_total{};
+  std::unordered_map<std::string, Duration> m_activities;
 };

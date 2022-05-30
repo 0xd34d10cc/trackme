@@ -38,5 +38,5 @@ inline Date current_date() {
 	return round_down<Days>(Clock::now());
 }
 
-std::string to_humantime(Duration time);
+std::string to_humantime(Duration time, std::string_view delimiter = "");
 Duration parse_humantime(std::string_view time);

@@ -118,7 +118,7 @@ constexpr std::string_view PIE_TEMPLATE_BEGIN = R"(
 constexpr std::string_view PIE_TEMPLATE_END = R"(
 ]);
         var options = {{
-          title: 'My Activities. Total: {}',
+          title: 'Total time tracked: {}',
           pieHole: 0.4,
         }};
 
@@ -138,18 +138,30 @@ PieReporter::PieReporter(std::ostream& stream) : m_stream(stream) {
 }
 
 void PieReporter::add(const ActivityEntry& activity) {
-  m_activityAggr[activity.exe_name()] += activity.end - activity.begin;
+  const auto spent = activity.end - activity.begin;
+  m_activities[activity.exe_name()] += spent;
+  m_total += spent;
 }
 
 PieReporter::~PieReporter() {
-  Duration total{};
+  std::vector<std::pair<std::string, Duration>> activities(m_activities.begin(),
+                                                           m_activities.end());
+  // sort by time tracked, descending
+  std::sort(activities.begin(), activities.end(),
+            [](const auto& left, const auto& right) {
+              return left.second >= right.second;
+            });
 
-  for (const auto& [activity, duration] : m_activityAggr) {
+  const auto total = static_cast<double>(std::chrono::duration_cast<Seconds>(m_total).count());
+  for (const auto& [activity, duration] : activities) {
     const auto seconds = std::chrono::duration_cast<Seconds>(duration).count();
-    m_stream << std::format("['{}', {}, '{}'], \n", js_escape(activity), seconds, to_humantime(duration));
-    total += duration;
+    const auto percent = 100.0 * static_cast<double>(seconds) / total;
+    const auto tooltip = std::format("{} - {} ({:.2}%)", activity,
+                                     to_humantime(duration, " "), percent);
+    m_stream << std::format("['{}', {}, '{}'], \n", js_escape(activity),
+                            seconds, js_escape(tooltip));
   }
 
-  m_stream << std::format(PIE_TEMPLATE_END, to_humantime(total));
+  m_stream << std::format(PIE_TEMPLATE_END, to_humantime(m_total, " "));
   m_stream.flush();
 }
