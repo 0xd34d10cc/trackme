@@ -83,7 +83,7 @@ void TimeLineReporter::add(const ActivityEntry& activity) {
     const auto time_of_day = TimeOfDay(time - day_start);
 
     stream << "new Date(" << static_cast<int>(date.year()) << ", "
-           << static_cast<unsigned>(date.month()) << ", "
+           << (static_cast<unsigned>(date.month()) - 1) << ", " // months are indexed from 0 in JS
            << static_cast<unsigned>(date.day()) << ",";
 
     stream << time_of_day.hours().count() << ", "
