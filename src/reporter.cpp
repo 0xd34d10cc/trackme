@@ -91,10 +91,7 @@ void TimeLineReporter::add(const ActivityEntry& activity) {
            << time_of_day.seconds().count() << ")";
   };
 
-  const auto exe_filename =
-      std::filesystem::path(activity.executable).filename().string();
-
-  m_stream << "['" << js_escape(exe_filename) << "', ";
+  m_stream << "['" << js_escape(activity.exe_name()) << "', ";
   m_stream << "'" << js_escape(activity.title) << "', ";
   write_datetime(m_stream, activity.begin);
   m_stream << ", ";
@@ -108,17 +105,20 @@ constexpr std::string_view PIE_TEMPLATE_BEGIN = R"(
   <head>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="text/javascript">
-      google.charts.load("current", {packages:["corechart"]});
+      google.charts.load("current", { packages: ["corechart"] });
       google.charts.setOnLoadCallback(drawChart);
       function drawChart() {
-        var data = google.visualization.arrayToDataTable([
-          ['Activity', 'Minutes'],
+        var data = new google.visualization.DataTable()
+        data.addColumn('string', 'Activity')
+        data.addColumn('number', 'Seconds')
+        data.addColumn({ type: 'string', role: 'tooltip' })
+        data.addRows([
 )";
 
 constexpr std::string_view PIE_TEMPLATE_END = R"(
 ]);
         var options = {{
-          title: 'My Activities. Total: {} minutes',
+          title: 'My Activities. Total: {}',
           pieHole: 0.4,
         }};
 
@@ -138,22 +138,18 @@ PieReporter::PieReporter(std::ostream& stream) : m_stream(stream) {
 }
 
 void PieReporter::add(const ActivityEntry& activity) {
-  const auto short_name =
-      std::filesystem::path(activity.executable).filename().string();
-  m_activityAggr[short_name] += activity.end - activity.begin;
+  m_activityAggr[activity.exe_name()] += activity.end - activity.begin;
 }
 
 PieReporter::~PieReporter() {
-  std::size_t total_minutes = 0;
+  Duration total{};
 
   for (const auto& [activity, duration] : m_activityAggr) {
-    // TODO: avoid losing seconds because of flooring duration
-    auto duration_minutes =
-        std::chrono::duration_cast<Minutes>(duration).count();
-    m_stream << std::format("['{}', {}], \n", js_escape(activity), duration_minutes);
-    total_minutes += duration_minutes;
+    const auto seconds = std::chrono::duration_cast<Seconds>(duration).count();
+    m_stream << std::format("['{}', {}, '{}'], \n", js_escape(activity), seconds, to_humantime(duration));
+    total += duration;
   }
 
-  m_stream << std::format(PIE_TEMPLATE_END, total_minutes);
+  m_stream << std::format(PIE_TEMPLATE_END, to_humantime(total));
   m_stream.flush();
 }

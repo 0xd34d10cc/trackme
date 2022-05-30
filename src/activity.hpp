@@ -16,6 +16,8 @@ struct Activity {
   std::string executable;
   std::string title;
 
+  std::string exe_name() const;
+
   auto operator<=>(const Activity&) const = default;
 };
 

@@ -5,8 +5,15 @@
 #include <psapi.h>
 #include <winuser.h>
 
+#include <filesystem>
+
+
 bool Activity::valid() const {
   return pid != 0 && !executable.empty();
+}
+
+std::string Activity::exe_name() const {
+  return std::filesystem::path(executable).filename().string();
 }
 
 Activity Activity::current() {
