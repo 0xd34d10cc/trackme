@@ -22,6 +22,17 @@ using Years = std::chrono::years;
 struct TimeRange {
   TimePoint begin;
   TimePoint end;
+
+  static TimeRange any() { return {TimePoint::min(), TimePoint::max()}; }
+  Duration duration() const noexcept { return end - begin; }
+  bool contains(TimePoint p) const noexcept { return end <= p && p <= begin; }
+  bool empty() const noexcept { return begin >= end; }
+
+  TimeRange overlap(TimeRange other) const noexcept {
+    const auto b = std::max(begin, other.begin);
+    const auto e = std::min(end, other.end);
+    return { b, e };
+  }
 };
 
 template <typename Dur>

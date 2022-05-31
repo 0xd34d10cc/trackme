@@ -72,80 +72,12 @@ static fs::path data_path(Date date) {
   return dir / name;
 }
 
-static void report_timeline(const std::vector<fs::path> files,
-                              const fs::path& report_path) {
-  auto report_file =
-      std::fstream(report_path, std::fstream::out | std::fstream::binary);
-  TimeLineReporter reporter{report_file};
-
-  for (auto& activities_path : files) {
-    auto activities_file =
-        std::fstream{activities_path, std::fstream::in | std::fstream::binary};
-
-    ActivityReader reader{activities_file, activities_path.string()};
-    ActivityEntry entry;
-    while (reader.read(entry)) {
-      reporter.add(entry);
-    }
-  }
-}
-
-static void report_pie(const std::vector<fs::path> files,
-  const fs::path& report_path) {
-  auto report_file =
-      std::fstream(report_path, std::fstream::out | std::fstream::binary);
-  PieReporter reporter{report_file};
-
-  for (auto& activities_path : files) {
-    auto activities_file =
-        std::fstream{activities_path, std::fstream::in | std::fstream::binary};
-
-    ActivityReader reader{activities_file, activities_path.string()};
-    ActivityEntry entry;
-    while (reader.read(entry)) {
-      reporter.add(entry);
-    }
-  }
-}
-
-static bool show_report(const fs::path& report_path) {
-  wchar_t app[512];
-  auto data = report_path.generic_wstring();
-  int status = reinterpret_cast<int>(FindExecutableW(data.c_str(), NULL, app));
-  if (status > 32) {
-    data = L"file:///" + data;
-    ShellExecuteW(0, NULL, app, data.c_str(), NULL, SW_SHOWNORMAL);
-    return true;
-  }
-
-  return false;
-}
-
-
-#define WM_USER_SHELLICON WM_USER + 1
-
-// Global Variables:
-// TODO: use SetProp/GetProp instead
-NOTIFYICONDATA nidApp;
-
-static std::atomic<bool> paused = false;
-static std::atomic<const std::exception*> global_exception = nullptr;
-
-static bool set_global_exception(const std::exception* e) {
-  const std::exception* expected = nullptr;
-  return global_exception.compare_exchange_strong(expected, e);
-}
-
-static const std::exception* get_global_exception() {
-  return global_exception.load();
-}
-
 static std::vector<fs::path> get_filepathes(HWND hWnd) {
   const auto dir = utf8_decode(trackme_dir().string());
 
   static const std::size_t MAX_CHARACTERS = 4096;
   OPENFILENAME options;
-  wchar_t buffer[MAX_CHARACTERS+1]; // +1 for null
+  wchar_t buffer[MAX_CHARACTERS + 1];  // +1 for null
   buffer[0] = 0;
 
   std::memset(&options, 0, sizeof(options));
@@ -182,11 +114,74 @@ static std::vector<fs::path> get_filepathes(HWND hWnd) {
   } else {
     const auto ec = CommDlgExtendedError();
     if (ec) {
-      throw std::runtime_error(std::format("Failed to open file dialogue. Error code 0x{:x}", ec));
+      throw std::runtime_error(
+          std::format("Failed to open file dialogue. Error code 0x{:x}", ec));
     }
   }
 
   return files;
+}
+
+static void report_files(Reporter& reporter, const std::vector<fs::path> files) {
+  for (const auto& path : files) {
+    std::fstream file{path, std::fstream::in | std::fstream::binary};
+    ActivityReader reader{file, path.string()};
+
+    ActivityEntry entry;
+    while (reader.read(entry)) {
+      reporter.add(entry);
+    }
+  }
+}
+
+static bool show_report(const fs::path& report_path) {
+  wchar_t app[512];
+  auto data = report_path.generic_wstring();
+  int status = reinterpret_cast<int>(FindExecutableW(data.c_str(), NULL, app));
+  if (status > 32) {
+    data = L"file:///" + data;
+    ShellExecuteW(0, NULL, app, data.c_str(), NULL, SW_SHOWNORMAL);
+    return true;
+  }
+
+  return false;
+}
+
+template <typename ReporterFactory>
+static void report(HWND window, ReporterFactory factory) {
+  try {
+    const auto files = get_filepathes(window);
+    if (files.empty()) {
+      return;
+    }
+
+    const auto report_path = trackme_dir() / "report.html";
+    auto report = std::fstream(report_path, std::fstream::out | std::fstream::binary);
+    auto reporter = factory(report);
+    report_files(reporter, files);
+    show_report(report_path);
+  } catch (const std::exception& e) {
+    MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
+                MB_ICONERROR | MB_OK);
+  }
+}
+
+#define WM_USER_SHELLICON WM_USER + 1
+
+// Global Variables:
+// TODO: use SetProp/GetProp instead
+NOTIFYICONDATA nidApp;
+
+static std::atomic<bool> paused = false;
+static std::atomic<const std::exception*> global_exception = nullptr;
+
+static bool set_global_exception(const std::exception* e) {
+  const std::exception* expected = nullptr;
+  return global_exception.compare_exchange_strong(expected, e);
+}
+
+static const std::exception* get_global_exception() {
+  return global_exception.load();
 }
 
 LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
@@ -199,6 +194,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
   static const uint32_t menu_pause_id = 1338;
   static const uint32_t menu_timeline_report = 1339;
   static const uint32_t menu_pie_report = 1340;
+  static const uint32_t menu_pie_ranges_report = 1341;
   static const uint32_t append = 0xFFFFFFFF;
 
   switch (message) {
@@ -215,6 +211,8 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
                      L"Report timeline");
           InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_pie_report, L"Report pie");
+          InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
+                     menu_pie_ranges_report, L"Report pie ranges");
           InsertMenu(hPopMenu, append, MF_BYPOSITION | MF_STRING,
                      menu_exit_id, L"Exit");
           SetForegroundWindow(hWnd);
@@ -237,29 +235,29 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
           paused = !paused;
           break;
         case menu_timeline_report: {
-          try {
-            const auto files = get_filepathes(hWnd);
-            if (!files.empty()) {
-              report_timeline(files, trackme_dir() / "report.html");
-              show_report(trackme_dir() / "report.html");
-            }
-          } catch (const std::exception& e) {
-            MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
-                        MB_ICONERROR | MB_OK);
-          }
+          report(hWnd, [](std::fstream& out) { return TimeLineReporter(out); });
           break;
         }
         case menu_pie_report: {
-          try {
-            const auto files = get_filepathes(hWnd);
-            if (!files.empty()) {
-              report_pie(files, trackme_dir() / "report.html");
-              show_report(trackme_dir() / "report.html");
-            }
-          } catch (const std::exception& e) {
-            MessageBoxA(NULL, e.what(), "trackme - failed to generate report",
-                        MB_ICONERROR | MB_OK);
-          }
+          report(hWnd, [](std::fstream& out) {
+            return PieReporter{out, {{"Total", TimeRange::any()}}};
+          });
+          break;
+        }
+        case menu_pie_ranges_report: {
+          report(hWnd, [](std::fstream& out) {
+            const auto now = Clock::now();
+            const auto today = round_down<Days>(now);
+            std::vector<std::pair<std::string, TimeRange>> ranges{
+                {"Today", TimeRange{today, now}},
+                {"Last 3 days", TimeRange(today - Days(2), now)},
+                {"Last 7 days", TimeRange(today - Days(6), now)},
+                {"Last 28 days", TimeRange(today - Days(27), now)},
+                {"All", TimeRange::any()},
+            };
+
+            return PieReporter{out, ranges};
+          });
           break;
         }
         default:

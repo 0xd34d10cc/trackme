@@ -108,51 +108,69 @@ constexpr std::string_view PIE_TEMPLATE_BEGIN = R"(
       google.charts.load("current", { packages: ["corechart"] });
       google.charts.setOnLoadCallback(drawChart);
       function drawChart() {
+)";
+
+constexpr std::string_view PIE_TEMPLATE_CHART_BEGIN = R"(
         var data = new google.visualization.DataTable()
         data.addColumn('string', 'Activity')
         data.addColumn('number', 'Seconds')
         data.addColumn({ type: 'string', role: 'tooltip' })
         data.addRows([
+
 )";
 
-constexpr std::string_view PIE_TEMPLATE_END = R"(
-]);
+constexpr std::string_view PIE_TEMPLATE_CHART_END = R"(
+        ]);
         var options = {{
-          title: 'Total time tracked: {}',
+          title: '{}',
           pieHole: 0.4,
         }};
 
-        var chart = new google.visualization.PieChart(document.getElementById('donutchart'));
+        var chart = new google.visualization.PieChart(document.getElementById('{}'));
         chart.draw(data, options);
-      }}
+)";
+
+constexpr std::string_view PIE_TEMPLATE_CHARTS_END = R"(
+      }
     </script>
   </head>
   <body>
-    <div id="donutchart" style="width: 900px; height: 500px;"></div>
+)";
+
+constexpr std::string_view PIE_TEMPLATE_END = R"(
   </body>
 </html>
 )";
 
-PieReporter::PieReporter(std::ostream& stream) : m_stream(stream) {
-  m_stream << PIE_TEMPLATE_BEGIN;
+PieReporter::PieReporter(
+    std::ostream& stream,
+    std::vector<std::pair<std::string, TimeRange>> ranges)
+    : m_stream(stream) {
+  for (auto&& [name, range] : ranges) {
+    m_groups.emplace_back(std::move(name), range);
+  }
 }
 
 void PieReporter::add(const ActivityEntry& activity) {
-  const auto spent = activity.end - activity.begin;
-  m_activities[activity.exe_name()] += spent;
-  m_total += spent;
+  for (auto& group : m_groups) {
+    group.track(activity);
+  }
 }
 
-PieReporter::~PieReporter() {
-  std::vector<std::pair<std::string, Duration>> activities(m_activities.begin(),
-                                                           m_activities.end());
+void PieReporter::report_group(const StatsGroup& group) {
+  using TrackedActivity = std::pair<std::string, Duration>;
+  std::vector<TrackedActivity> activities(group.activities.begin(),
+                                          group.activities.end());
   // sort by time tracked, descending
   std::sort(activities.begin(), activities.end(),
             [](const auto& left, const auto& right) {
               return left.second >= right.second;
             });
 
-  const auto total = static_cast<double>(std::chrono::duration_cast<Seconds>(m_total).count());
+  m_stream << PIE_TEMPLATE_CHART_BEGIN;
+  const auto total = static_cast<double>(
+      std::chrono::duration_cast<Seconds>(group.total).count());
+
   for (const auto& [activity, duration] : activities) {
     const auto seconds = std::chrono::duration_cast<Seconds>(duration).count();
     const auto percent = 100.0 * static_cast<double>(seconds) / total;
@@ -162,6 +180,24 @@ PieReporter::~PieReporter() {
                             seconds, js_escape(tooltip));
   }
 
-  m_stream << std::format(PIE_TEMPLATE_END, to_humantime(m_total, " "));
+  const auto title = std::format("{} ({})", group.name, to_humantime(group.total, " "));
+  const auto& id = group.name;
+  m_stream << std::format(PIE_TEMPLATE_CHART_END, title, id);
+}
+
+PieReporter::~PieReporter() {
+  m_stream << PIE_TEMPLATE_BEGIN;
+  for (const auto& group : m_groups) {
+    report_group(group);
+  }
+  m_stream << PIE_TEMPLATE_CHARTS_END;
+
+  for (const auto& group : m_groups) {
+    m_stream << std::format(
+        R"(<div id="{}" style = "width: 900px; height: 500px;"></div>)",
+        group.name);
+  }
+
+  m_stream << PIE_TEMPLATE_END;
   m_stream.flush();
 }
