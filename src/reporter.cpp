@@ -135,9 +135,11 @@ constexpr std::string_view PIE_TEMPLATE_CHARTS_END = R"(
     </script>
   </head>
   <body>
+    <div id="grid" style="display: grid; grid-template: repeat(4, 1fr) / repeat(2, 1fr); grid-auto-flow: row dense;">
 )";
 
 constexpr std::string_view PIE_TEMPLATE_END = R"(
+    </div>
   </body>
 </html>
 )";
