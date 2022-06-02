@@ -57,14 +57,20 @@ void ActivityLog::write_entry(const ActivityEntry& entry) {
         m_buffer.data() + m_written, free_space, "{}, {}, {}, {}, {}\r\n",
         entry.begin, entry.end, entry.pid, entry.executable, entry.title);
 
-    if (n < free_space) {
+    if (static_cast<std::size_t>(n) < free_space) {
       m_written += n;
       return;
     }
 
     flush_buffer();
-    if (n > m_buffer.size()) {
-      m_buffer.resize(m_buffer.size() * 2);
+    if (static_cast<std::size_t>(n) > m_buffer.size()) {
+      const auto new_size = m_buffer.size() * 2;
+      const std::size_t MB = 1024ull * 1024ull;
+      if (new_size > 2 * MB) {
+        throw std::runtime_error("ActivityLog buffer overflow");
+      }
+
+      m_buffer.resize(new_size);
     }
   }
 }
