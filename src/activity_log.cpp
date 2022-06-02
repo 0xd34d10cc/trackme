@@ -51,16 +51,20 @@ void ActivityLog::flush_buffer() {
 }
 
 void ActivityLog::write_entry(const ActivityEntry& entry) {
-  const auto [end, n] =
-      std::format_to_n(m_buffer.data() + m_written, m_buffer.size() - m_written,
-                       "{}, {}, {}, {}, {}\r\n", entry.begin, entry.end,
-                       entry.pid, entry.executable, entry.title);
-  if (end >= m_buffer.data() + m_buffer.size()) {
-    flush_buffer();
-    // TODO: check for n > 4096
-    write_entry(entry);
-    return;
-  }
+  while (true) {
+    const auto free_space = m_buffer.size() - m_written;
+    const auto [end, n] = std::format_to_n(
+        m_buffer.data() + m_written, free_space, "{}, {}, {}, {}, {}\r\n",
+        entry.begin, entry.end, entry.pid, entry.executable, entry.title);
 
-  m_written += n;
+    if (n < free_space) {
+      m_written += n;
+      return;
+    }
+
+    flush_buffer();
+    if (n > m_buffer.size()) {
+      m_buffer.resize(m_buffer.size() * 2);
+    }
+  }
 }

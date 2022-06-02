@@ -365,7 +365,10 @@ static void run(HINSTANCE instance) {
   Executor executor;
   executor.spawn_periodic(Seconds(1), [&log, &limiter, max_idle = config.max_idle_time] {
     static const Activity idle_activity = {
-        .pid = 0, .executable = "idle", .title = "afk"};
+        .pid = 0,
+        .executable = "idle",
+        .title = "afk"
+    };
 
     if (paused) {
       log.flush();
