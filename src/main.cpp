@@ -148,9 +148,19 @@ static bool show_report(const fs::path& report_path) {
 }
 
 template <typename ReporterFactory>
-static void report(HWND window, ReporterFactory factory) {
+static void report(HWND window, ReporterFactory factory, bool user_select = true) {
   try {
-    const auto files = get_filepathes(window);
+    std::vector<fs::path> files;
+    if (user_select) {
+      files = get_filepathes(window);
+    } else {
+      for (const auto &entry : fs::directory_iterator(trackme_dir())) {
+        if (entry.path().extension() == ".csv") {
+          files.push_back(entry.path());
+        }
+      }
+    }
+
     if (files.empty()) {
       return;
     }
@@ -257,7 +267,7 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
             };
 
             return PieReporter{out, ranges};
-          });
+          }, false);
           break;
         }
         default:
