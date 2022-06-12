@@ -352,13 +352,15 @@ static void run_win32_event_loop() {
 }
 
 static void track_activities(Limiter& limiter, const fs::path& path) {
+  // temporary disable notification to prevent popups on startup
+  limiter.enable_notifications(false);
   auto file = std::fstream{path, std::fstream::in | std::fstream::binary};
   ActivityReader reader{file, path.string()};
   ActivityEntry entry;
   while (reader.read(entry)) {
-    // TODO: don't show any notifications while processing old events
     limiter.track(entry, entry.end - entry.begin);
   }
+  limiter.enable_notifications(true);
 }
 
 

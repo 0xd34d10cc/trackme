@@ -23,6 +23,7 @@ class Limiter {
 
   void track(const Activity& activity, Duration time);
   void reset();
+  void enable_notifications(bool notify);
 
  private:
   using StatsMap = std::unordered_map<GroupID, Stats>;
@@ -30,5 +31,6 @@ class Limiter {
   Limiter(std::unique_ptr<ActivityMatcher> matcher, StatsMap stats);
 
   std::unique_ptr<ActivityMatcher> m_matcher;
+  bool m_notify;
   StatsMap m_stats;
 };
