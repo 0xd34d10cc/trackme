@@ -19,13 +19,12 @@ Stats Stats::parse(const Json& data) {
 }
 
 Limiter::Limiter()
-    : m_matcher(std::make_unique<NoneMatcher>()), m_stats(), m_notify(true) {}
+    : m_stats(), m_notify(true) {}
 
-Limiter::Limiter(std::unique_ptr<ActivityMatcher> matcher, StatsMap stats)
-    : m_matcher(std::move(matcher)), m_stats(std::move(stats)), m_notify(true) {}
+Limiter::Limiter(StatsMap stats)
+    : m_stats(std::move(stats)), m_notify(true) {}
 
-void Limiter::track(const Activity& activity, Duration time) {
-  const auto id = m_matcher->match(activity);
+void Limiter::track(const GroupID& id, Duration time) {
   if (id.empty()) {
     return;
   }
@@ -40,7 +39,7 @@ void Limiter::track(const Activity& activity, Duration time) {
   stats.active += time;
 
   if (!limit_exceeded && stats.active > stats.limit && m_notify) {
-    show_notification(activity.title + " - time's up");
+    show_notification(id + " - time's up");
   }
 }
 
@@ -65,6 +64,5 @@ Limiter Limiter::parse(const Json& data) {
     stats.emplace(id, Stats::parse(s));
   }
 
-  auto matcher = parse_matcher(data["matcher"]);
-  return Limiter(std::move(matcher), std::move(stats));
+  return Limiter(std::move(stats));
 }

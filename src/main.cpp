@@ -41,9 +41,14 @@ struct Config {
       config.limiter = Limiter::parse(data["limiter"]);
     }
 
+    if (data.contains("matcher")) {
+      config.matcher = parse_matcher(data["matcher"]);
+    }
+
     return config;
   }
 
+  std::unique_ptr<ActivityMatcher> matcher{std::make_unique<NoneMatcher>()};
   Duration max_idle_time;
   Limiter limiter;
 };
@@ -200,12 +205,13 @@ LRESULT CALLBACK on_window_message(HWND hWnd, UINT message, WPARAM wParam,
   POINT lpClickPoint;
   HMENU hPopMenu;
 
-  static const uint32_t menu_exit_id = 1337;
-  static const uint32_t menu_pause_id = 1338;
-  static const uint32_t menu_timeline_report = 1339;
-  static const uint32_t menu_pie_report = 1340;
-  static const uint32_t menu_pie_ranges_report = 1341;
-  static const uint32_t append = 0xFFFFFFFF;
+  // TODO: build an abstraction for menu items
+  static const std::uint32_t menu_exit_id = 1337;
+  static const std::uint32_t menu_pause_id = 1338;
+  static const std::uint32_t menu_timeline_report = 1339;
+  static const std::uint32_t menu_pie_report = 1340;
+  static const std::uint32_t menu_pie_ranges_report = 1341;
+  static const std::uint32_t append = 0xFFFFFFFF;
 
   switch (message) {
     case WM_USER_SHELLICON:
@@ -351,18 +357,18 @@ static void run_win32_event_loop() {
   }
 }
 
-static void track_activities(Limiter& limiter, const fs::path& path) {
+static void track_activities(ActivityMatcher& matcher, Limiter& limiter, const fs::path& path) {
   // temporary disable notification to prevent popups on startup
   limiter.enable_notifications(false);
   auto file = std::fstream{path, std::fstream::in | std::fstream::binary};
   ActivityReader reader{file, path.string()};
   ActivityEntry entry;
+
   while (reader.read(entry)) {
-    limiter.track(entry, entry.end - entry.begin);
+    limiter.track(matcher.match(entry), entry.end - entry.begin);
   }
   limiter.enable_notifications(true);
 }
-
 
 static void run(HINSTANCE instance) {
   init_systray(instance);
@@ -370,12 +376,15 @@ static void run(HINSTANCE instance) {
 
   const auto path = data_path(current_date());
   auto config = load_config();
+  auto& matcher = *config.matcher;
   auto& limiter = config.limiter;
-  track_activities(limiter, path);
+  track_activities(matcher, limiter, path);
   auto log = ActivityLog::open(path);
 
   Executor executor;
-  executor.spawn_periodic(Seconds(1), [&log, &limiter, max_idle = config.max_idle_time] {
+  executor.spawn_periodic(Seconds(1), [&log, &limiter, &matcher,
+                                       max_idle = config.max_idle_time] {
+
     static const Activity idle_activity = {
         .pid = 0,
         .executable = "idle",
@@ -390,16 +399,17 @@ static void run(HINSTANCE instance) {
     const auto now = Clock::now();
     if (idle_time() > max_idle) {
       log.track(idle_activity, now);
-    } else {
-      auto activity = Activity::current();
-      if (!activity.valid()) {
-        return;
-      }
-
-      // TODO: use prev_now - now instead
-      limiter.track(activity, Seconds(1));
-      log.track(std::move(activity), now);
+      return;
     }
+
+    auto activity = Activity::current();
+    if (!activity.valid()) {
+      return;
+    }
+
+    // TODO: use prev_now - now instead
+    limiter.track(matcher.match(activity), Seconds(1));
+    log.track(std::move(activity), now);
   });
 
   const auto tomorrow = round_up<Days>(Clock::now());

@@ -21,16 +21,15 @@ class Limiter {
   Limiter();
   static Limiter parse(const Json& data);
 
-  void track(const Activity& activity, Duration time);
+  void track(const GroupID& id, Duration time);
   void reset();
   void enable_notifications(bool notify);
 
  private:
   using StatsMap = std::unordered_map<GroupID, Stats>;
 
-  Limiter(std::unique_ptr<ActivityMatcher> matcher, StatsMap stats);
+  Limiter(StatsMap stats);
 
-  std::unique_ptr<ActivityMatcher> m_matcher;
   bool m_notify;
   StatsMap m_stats;
 };

@@ -3,7 +3,10 @@
 #include <format>
 
 ActivityLog::ActivityLog(std::fstream file, std::optional<Activity> activity)
-    : m_file(std::move(file)), m_buffer(4096), m_written(0), m_current(std::move(activity)) {}
+    : m_file(std::move(file)),
+      m_buffer(4096),
+      m_written(0),
+      m_current(std::move(activity)) {}
 
 ActivityLog ActivityLog::open(const std::filesystem::path& path) {
   const auto flags = std::ios::out | std::ios::binary | std::ios::app;
