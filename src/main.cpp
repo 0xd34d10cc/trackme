@@ -17,6 +17,7 @@
 #include <fstream>
 #include <thread>
 #include <utility>
+#include <unordered_set>
 #include <system_error>
 
 
@@ -45,9 +46,14 @@ struct Config {
       config.matcher = parse_matcher(data["matcher"]);
     }
 
+    if (data.contains("blacklist")) {
+      config.blacklist = data["blacklist"].get<std::unordered_set<GroupID>>();
+    }
+
     return config;
   }
 
+  std::unordered_set<GroupID> blacklist;
   std::unique_ptr<ActivityMatcher> matcher{std::make_unique<NoneMatcher>()};
   Duration max_idle_time;
   Limiter limiter;
@@ -378,11 +384,12 @@ static void run(HINSTANCE instance) {
   auto config = load_config();
   auto& matcher = *config.matcher;
   auto& limiter = config.limiter;
+  const auto& blacklist = config.blacklist;
   track_activities(matcher, limiter, path);
   auto log = ActivityLog::open(path);
 
   Executor executor;
-  executor.spawn_periodic(Seconds(1), [&log, &limiter, &matcher,
+  executor.spawn_periodic(Seconds(1), [&log, &limiter, &matcher, &blacklist,
                                        max_idle = config.max_idle_time] {
 
     static const Activity idle_activity = {
@@ -407,8 +414,13 @@ static void run(HINSTANCE instance) {
       return;
     }
 
+    const auto id = matcher.match(activity);
+    if (blacklist.contains(id)) {
+      return;
+    }
+
     // TODO: use prev_now - now instead
-    limiter.track(matcher.match(activity), Seconds(1));
+    limiter.track(id, Seconds(1));
     log.track(std::move(activity), now);
   });
 
