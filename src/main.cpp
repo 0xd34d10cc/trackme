@@ -427,6 +427,7 @@ static void run(HINSTANCE instance) {
 
     const auto id = matcher.match(activity);
     if (blacklist.contains(id)) {
+      log.flush();
       return;
     }
 
