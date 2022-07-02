@@ -7,6 +7,7 @@
 #include "unicode.hpp"
 #include "limiter.hpp"
 #include "reporter.hpp"
+#include "games.hpp"
 
 #include <windows.h>
 #include <strsafe.h>
@@ -33,6 +34,19 @@ static fs::path trackme_dir() {
   }
 }
 
+static std::vector<std::unique_ptr<ActivityMatcher>> embedded_matchers() {
+  std::unordered_set<std::string> games;
+  for (const auto& game : GAMES) {
+    games.emplace(game);
+  }
+
+  auto games_matcher = std::make_unique<SetMatcher>("games", std::move(games));
+
+  std::vector<std::unique_ptr<ActivityMatcher>> matchers;
+  matchers.emplace_back(std::move(games_matcher));
+  return matchers;
+}
+
 struct Config {
   static Config parse(const Json& data) {
     Config config;
@@ -50,6 +64,10 @@ struct Config {
       config.blacklist = data["blacklist"].get<std::unordered_set<GroupID>>();
     }
 
+    auto matchers = embedded_matchers();
+    matchers.push_back(std::move(config.matcher));
+
+    config.matcher = std::make_unique<ListMatcher>(std::move(matchers));
     return config;
   }
 

@@ -82,6 +82,25 @@ std::unique_ptr<RegexMatcher> RegexMatcher::parse(const Json& data) {
   return matcher;
 }
 
+SetMatcher::SetMatcher(GroupID id, std::unordered_set<std::string> executables)
+    : m_id(std::move(id))
+    , m_executables(std::move(executables)) {}
+
+SetMatcher::~SetMatcher() {}
+
+GroupID SetMatcher::match(const Activity& activity) {
+  auto exe = activity.exe_name();
+  for (char& c : exe) {
+    c = tolower(c);
+  }
+
+  if (m_executables.contains(exe)) {
+    return m_id;
+  }
+
+  return {};
+}
+
 std::unique_ptr<ActivityMatcher> parse_matcher(const Json& data) {
   if (data.is_array()) {
     return ListMatcher::parse(data);

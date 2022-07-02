@@ -8,6 +8,7 @@
 #include <vector>
 #include <memory>
 #include <regex>
+#include <unordered_set>
 
 
 using Json = nlohmann::json;
@@ -64,6 +65,18 @@ private:
   std::regex m_re;
   ActivityField m_field;
   std::string m_expr;
+};
+
+class SetMatcher : public ActivityMatcher {
+public:
+  SetMatcher(GroupID id, std::unordered_set<std::string> executables);
+ ~SetMatcher() override;
+
+ GroupID match(const Activity& activity) override;
+
+private:
+ GroupID m_id;
+ std::unordered_set<std::string> m_executables;
 };
 
 // factory function for above

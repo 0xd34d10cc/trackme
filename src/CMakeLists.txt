@@ -22,6 +22,8 @@ add_executable(
   limiter.cpp
   reporter.hpp
   reporter.cpp
+  games.hpp
+  games.cpp
 )
 
 target_compile_definitions(
@@ -84,6 +86,6 @@ set(CPACK_ALL_INSTALL_TYPES Full Developer)
 set(CPACK_COMPONENT_LIBRARIES_INSTALL_TYPES Developer Full)
 set(CPACK_COMPONENT_HEADERS_INSTALL_TYPES Developer Full)
 set(CPACK_COMPONENT_APPLICATIONS_INSTALL_TYPES Full)
- 
+
 # Must be after the last CPACK macros
 include(CPack)
