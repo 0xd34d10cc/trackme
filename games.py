@@ -16,10 +16,11 @@ def main():
     executables = list(executables)
     with open('src/games.cpp', 'wt', encoding='utf8') as out:
         out.write('#include "games.hpp"\n')
-        out.write('const std::unordered_set<const char*> GAMES = {\n')
+        out.write('using namespace std::literals::string_view_literals;\n')
+        out.write('const std::unordered_set<std::string_view> GAMES = {\n')
         for i in range(len(executables) - 1):
-            out.write(f'  "{executables[i]}",\n')
-        out.write(f'  "{executables[-1]}"\n')
+            out.write(f'  "{executables[i]}"sv,\n')
+        out.write(f'  "{executables[-1]}"sv\n')
         out.write('};\n')
 
 

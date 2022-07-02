@@ -35,15 +35,8 @@ static fs::path trackme_dir() {
 }
 
 static std::vector<std::unique_ptr<ActivityMatcher>> embedded_matchers() {
-  std::unordered_set<std::string> games;
-  for (const auto& game : GAMES) {
-    games.emplace(game);
-  }
-
-  auto games_matcher = std::make_unique<SetMatcher>("games", std::move(games));
-
   std::vector<std::unique_ptr<ActivityMatcher>> matchers;
-  matchers.emplace_back(std::move(games_matcher));
+  matchers.emplace_back(std::make_unique<StaticSetMatcher>("games", GAMES));
   return matchers;
 }
 

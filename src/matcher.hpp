@@ -79,5 +79,17 @@ private:
  std::unordered_set<std::string> m_executables;
 };
 
+class StaticSetMatcher : public ActivityMatcher {
+public:
+  StaticSetMatcher(GroupID id, const std::unordered_set<std::string_view>& executables);
+ ~StaticSetMatcher();
+
+ GroupID match(const Activity& activity) override;
+
+private:
+ GroupID m_id;
+ const std::unordered_set<std::string_view>& m_executables;
+};
+
 // factory function for above
 std::unique_ptr<ActivityMatcher> parse_matcher(const Json& data);

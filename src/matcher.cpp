@@ -89,9 +89,22 @@ SetMatcher::SetMatcher(GroupID id, std::unordered_set<std::string> executables)
 SetMatcher::~SetMatcher() {}
 
 GroupID SetMatcher::match(const Activity& activity) {
+  if (m_executables.contains(activity.exe_name())) {
+    return m_id;
+  }
+
+  return {};
+}
+
+StaticSetMatcher ::StaticSetMatcher(GroupID id, const std::unordered_set<std::string_view>& executables)
+    : m_id(std::move(id))
+    , m_executables(std::move(executables)) {}
+StaticSetMatcher ::~StaticSetMatcher() {}
+
+GroupID StaticSetMatcher::match(const Activity& activity) {
   auto exe = activity.exe_name();
   for (char& c : exe) {
-    c = tolower(c);
+    c = std::tolower(c);
   }
 
   if (m_executables.contains(exe)) {
