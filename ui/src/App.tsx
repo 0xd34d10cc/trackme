@@ -1,32 +1,91 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
+import { useEffect, useState } from 'react'
+import { readTextFile, BaseDirectory } from '@tauri-apps/api/fs';
+import { Chart, GoogleDataTableColumn } from 'react-google-charts'
+import Calendar from 'react-calendar'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+type ActivityEntry = [string, string, Date, Date]
 
+async function readCsv(filename: string): Promise<ActivityEntry[]> {
+  const content = await readTextFile(filename, { dir: BaseDirectory.Home })
+  const entries = content.split('\r\n')
+  let activities: ActivityEntry[] = []
+  for (const entry of entries) {
+    if (entry.length == 0) {
+      break
+    }
+
+    const [start, end, pid, exe, title] = entry.split(', ')
+    const activity: ActivityEntry = [exe, title, new Date(start), new Date(end)]
+    activities.push(activity)
+  }
+
+  return Promise.resolve(activities)
+}
+
+const Months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+]
+
+function getLogFilename(date: Date): string {
+  const day = ('0' + date.getDate()).slice(-2)
+  const month = Months[date.getMonth()]
+  const year = date.getFullYear()
+  return `trackme/${day}-${month}-${year}.csv`
+}
+
+function App() {
+  const columns: GoogleDataTableColumn[] = [
+    { type: 'string', id: 'Executable' },
+    { type: 'string', id: 'Title' },
+    { type: 'date', id: 'Start' },
+    { type: 'date', id: 'End' }
+  ]
+
+  const [rows, setRows] = useState(null as (null | ActivityEntry[]))
+  const [date, setDate] = useState(new Date());
+
+  // const filename = 'trackme/04-Dec-2022.csv'
+  const filename = getLogFilename(date)
+  console.log(date, ' => ', filename)
+  useEffect(() => {
+    const loadRows = async () => {
+      const rows = await readCsv(filename)
+      setRows(rows)
+    }
+
+    loadRows()
+  }, [filename])
+
+  if (rows === null) {
+    return <div>Loading {filename}...</div>
+  }
+
+  const data = [columns, ...rows]
   return (
-    <div className="App">
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+    <div className="chart">
+      <Calendar onChange={setDate} value={date} />
+      <Chart
+        chartType="Timeline"
+        data={data}
+        options={{
+          timeline: { colorByRowLabel: true }
+        }}
+        width="100%"
+        height="400px"
+        legendToggle
+      />
     </div>
   )
 }

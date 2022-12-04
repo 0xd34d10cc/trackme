@@ -10,8 +10,11 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^1.2.0",
+    "@types/react-calendar": "^3.9.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-calendar": "^4.0.0",
+    "react-dom": "^18.2.0",
+    "react-google-charts": "^4.0.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.2.1",
