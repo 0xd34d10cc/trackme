@@ -66,7 +66,7 @@ struct Config {
 
   std::unordered_set<GroupID> blacklist;
   std::unique_ptr<ActivityMatcher> matcher{std::make_unique<NoneMatcher>()};
-  Duration max_idle_time;
+  Duration max_idle_time{Minutes(2)};
   Limiter limiter;
 };
 
@@ -375,7 +375,7 @@ static void run_win32_event_loop() {
 }
 
 static void track_activities(ActivityMatcher& matcher, Limiter& limiter, const fs::path& path) {
-  // temporary disable notification to prevent popups on startup
+  // temporarely disable notification to prevent popups on startup
   limiter.enable_notifications(false);
   auto file = std::fstream{path, std::fstream::in | std::fstream::binary};
   ActivityReader reader{file, path.string()};

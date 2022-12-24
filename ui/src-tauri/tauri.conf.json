@@ -15,7 +15,7 @@
       "all": false,
       "fs": {
         "all": true,
-        "scope": ["$HOME/*"]
+        "scope": ["$HOME/trackme/*"]
       }
     },
     "bundle": {
