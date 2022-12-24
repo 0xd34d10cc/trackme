@@ -10,11 +10,17 @@
     "version": "0.1.0"
   },
   "tauri": {
+    "systemTray": {
+      "iconPath": "icons/icon.ico",
+      "iconAsTemplate": true
+    },
     "allowlist": {
       "all": false,
       "fs": {
         "all": true,
-        "scope": ["$HOME/trackme/*"]
+        "scope": [
+          "$HOME/trackme/*"
+        ]
       }
     },
     "bundle": {
