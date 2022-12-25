@@ -3,9 +3,7 @@
     windows_subsystem = "windows"
 )]
 
-use tauri::{
-    CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
-};
+use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -16,9 +14,9 @@ fn main() {
     let exit = CustomMenuItem::new("exit".to_string(), "Exit");
     let show = CustomMenuItem::new("show".to_string(), "Show");
     let tray_menu = SystemTrayMenu::new()
-        .add_item(exit)
+        .add_item(show)
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(show);
+        .add_item(exit);
 
     let tray = SystemTray::new().with_menu(tray_menu);
     tauri::Builder::default()

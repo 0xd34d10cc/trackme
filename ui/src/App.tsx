@@ -3,6 +3,7 @@ import { readTextFile, BaseDirectory } from '@tauri-apps/api/fs'
 import { Chart, GoogleDataTableColumn, GoogleChartWrapperChartType, GoogleDataTableColumnRoleType } from 'react-google-charts'
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import CircularProgress from '@mui/material/CircularProgress';
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import MenuItem from '@mui/material/MenuItem'
@@ -141,8 +142,13 @@ function App() {
       />
     </LocalizationProvider>
 
-  let chart = <div>Loading {filename}...</div>
-  if (rows != null) {
+  let chart = null
+  if (rows === null) {
+    chart = <>
+      <div>Loading {filename}...</div>
+      <CircularProgress />
+    </>
+  } else {
     const data = getChartData(rows, type)
     chart = <Chart
       chartType={type}
