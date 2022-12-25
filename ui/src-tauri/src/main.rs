@@ -3,7 +3,7 @@
     windows_subsystem = "windows"
 )]
 
-use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
+use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu, Manager};
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -15,34 +15,45 @@ fn main() {
     let show = CustomMenuItem::new("show".to_string(), "Show");
     let tray_menu = SystemTrayMenu::new()
         .add_item(show)
-        .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(exit);
 
     let tray = SystemTray::new().with_menu(tray_menu);
     tauri::Builder::default()
         .system_tray(tray)
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::MenuItemClick { id, .. } => {
-                match id.as_str() {
-                    "exit" => {
-                        // FIXME: graceful shutdown?
-                        std::process::exit(0);
-                    }
-                    "show" => {
-                        tauri::WindowBuilder::new(
-                            app,
-                            "main",
-                            tauri::WindowUrl::App("index.html".into()),
-                        )
-                        // TODO: get title from config
-                        .title("Trackme UI")
-                        .build()
-                        .unwrap();
-                    }
-                    _ => {}
+        .on_system_tray_event(|app, event| {
+            let create_main_window = || {
+                let status = tauri::WindowBuilder::new(app, "main", tauri::WindowUrl::App("index.html".into()))
+                    // TODO: get title from config
+                    .title("Trackme UI")
+                    .build();
+                match status {
+                    Ok(_) => {},
+                    Err(tauri::Error::WindowLabelAlreadyExists(_)) => {
+                        if let Some(window) = app.get_window("main") {
+                            let _ = window.set_focus();
+                        }
+                    },
+                    Err(e) => panic!("Ooopsie: {}", e),
                 }
+
+            };
+            match event {
+                SystemTrayEvent::MenuItemClick { id, .. } => {
+                    match id.as_str() {
+                        "exit" => {
+                            app.exit(0);
+                        }
+                        "show" => {
+                            create_main_window();
+                        }
+                        _ => {}
+                    }
+                }
+                SystemTrayEvent::DoubleClick { .. } => {
+                    create_main_window();
+                }
+                _ => {}
             }
-            _ => {}
         })
         .invoke_handler(tauri::generate_handler![greet])
         .build(tauri::generate_context!())
