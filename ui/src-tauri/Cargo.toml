@@ -18,6 +18,16 @@ tauri-build = { version = "1.2.1", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.2.1", features = ["fs-all", "system-tray"] }
+tokio = { version = "1.23.0", default-features = false, features = ["time"] }
+csv = "1.1.6"
+dirs = "4.0.0"
+anyhow = "1.0.68"
+chrono = "0.4.23"
+windows = { version = "0.43.0", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus"] }
 
 [features]
 # by default Tauri runs in production mode

@@ -29,15 +29,20 @@ function getFilename(path: string): string {
 
 async function readCsv(filename: string): Promise<ActivityEntry[]> {
   const content = await readTextFile(filename, { dir: BaseDirectory.Home })
-  const entries = content.split('\r\n')
+  const entries = content.split('\n')
   let activities: ActivityEntry[] = []
   for (const entry of entries) {
     if (entry.length == 0) {
       break
     }
 
-    const [start, end, pid, exe, title] = entry.split(', ')
-    const activity: ActivityEntry = [getFilename(exe), title, new Date(start), new Date(end)]
+    const [start, end, pid, exe, title] = entry.split(',')
+    const activity: ActivityEntry = [
+      getFilename(exe.trim()),
+      title.trim(),
+      new Date(start.trim()),
+      new Date(end.trim())
+  ]
     activities.push(activity)
   }
 
