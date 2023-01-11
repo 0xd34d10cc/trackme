@@ -19,6 +19,7 @@
       "fs": {
         "all": true,
         "scope": [
+          "$HOME/trackme",
           "$HOME/trackme/*"
         ]
       }

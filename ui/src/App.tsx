@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { readTextFile, BaseDirectory } from '@tauri-apps/api/fs'
+import { readTextFile, readDir, BaseDirectory } from '@tauri-apps/api/fs'
 import { Chart, GoogleDataTableColumn, GoogleChartWrapperChartType, GoogleDataTableColumnRoleType } from 'react-google-charts'
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -7,11 +7,14 @@ import CircularProgress from '@mui/material/CircularProgress';
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import MenuItem from '@mui/material/MenuItem'
+import { styled } from '@mui/material/styles';
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import TextField from '@mui/material/TextField'
 import { LocalizationProvider } from '@mui/x-date-pickers';
+import { PickersDay, PickersDayProps } from '@mui/x-date-pickers/PickersDay';
+
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
-import { formatDuration, differenceInSeconds, intervalToDuration } from 'date-fns';
+import { formatDuration, differenceInSeconds, intervalToDuration, getUnixTime } from 'date-fns';
 
 type ActivityEntry = [string, string, Date, Date]
 
@@ -86,6 +89,19 @@ function aggregateTime(rows: ActivityEntry[]): IterableIterator<[string, number]
   return map.entries()
 }
 
+interface CustomPickerDayProps extends PickersDayProps<Date> {
+  dayIsUnavailable: boolean;
+}
+
+const CustomPickersDay = styled(PickersDay, {
+  shouldForwardProp: (prop) =>
+    prop !== 'dayIsUnavailable',
+})<CustomPickerDayProps>(({ theme, dayIsUnavailable }) => ({
+  ...(dayIsUnavailable && {
+    color: "#e1e1e1",
+  }),
+})) as React.ComponentType<CustomPickerDayProps>;
+
 const TimelineColumns: GoogleDataTableColumn[] = [
   { type: 'string', id: 'Executable' },
   { type: 'string', id: 'Title' },
@@ -117,13 +133,30 @@ function getChartData(rows: ActivityEntry[], chartType: string): any[] {
   throw new Error('Unknown chart type: ' + chartType)
 }
 
+
+async function getAvailableDates(): Promise<Set<number>> {
+  const dates = new Set<number>()
+  const entries = await readDir('trackme', { dir: BaseDirectory.Home })
+  for (const entry of entries) {
+    if (entry.name === undefined) {
+      continue
+    }
+    const [date, _] = entry.name.split(".")
+    const timepoint = getUnixTime(new Date(date))
+    dates.add(timepoint)
+  }
+
+  return dates
+}
+
+const fileEntries = await getAvailableDates()
+
 function App() {
   const [type, setType] = useState('Timeline' as GoogleChartWrapperChartType)
   const [rows, setRows] = useState(null as (null | ActivityEntry[]))
   const [date, setDate] = useState(new Date());
 
   const filename = getLogFilename(date)
-  console.log(date, ' => ', filename)
   useEffect(() => {
     const loadRows = async () => {
       const rows = await readCsv(filename)
@@ -134,6 +167,16 @@ function App() {
     loadRows()
   }, [filename])
 
+  const renderAvailableDays = (date: Date, selectedDates: Array<Date | null>, pickersDayProps: PickersDayProps<Date>) => {
+    const timepoint = getUnixTime(date)
+    return (
+      <CustomPickersDay
+        {...pickersDayProps}
+        disableMargin
+        dayIsUnavailable={!fileEntries.has(timepoint)}
+      />)
+  }
+
   const datePicker =
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <DatePicker
@@ -143,6 +186,7 @@ function App() {
             setDate(date);
           }
         }}
+        renderDay={renderAvailableDays}
         renderInput={(params: any) => <TextField {...params} />}
       />
     </LocalizationProvider>
