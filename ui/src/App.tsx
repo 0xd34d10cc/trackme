@@ -3,6 +3,7 @@ import { readTextFile, readDir, BaseDirectory } from '@tauri-apps/api/fs'
 import { Chart, GoogleDataTableColumn, GoogleChartWrapperChartType, GoogleDataTableColumnRoleType } from 'react-google-charts'
 
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
@@ -14,7 +15,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { PickersDay, PickersDayProps } from '@mui/x-date-pickers/PickersDay';
 
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
-import { formatDuration, differenceInSeconds, intervalToDuration, getUnixTime } from 'date-fns';
+import { formatDuration, differenceInSeconds, intervalToDuration, getUnixTime, fromUnixTime } from 'date-fns';
 
 type ActivityEntry = [string, string, Date, Date]
 
@@ -143,6 +144,9 @@ async function getAvailableDates(): Promise<Set<number>> {
     }
     const [date, _] = entry.name.split(".")
     const timepoint = getUnixTime(new Date(date))
+    if (Number.isNaN(timepoint)) {
+      continue
+    }
     dates.add(timepoint)
   }
 
@@ -154,16 +158,22 @@ const fileEntries = await getAvailableDates()
 function App() {
   const [type, setType] = useState('Timeline' as GoogleChartWrapperChartType)
   const [rows, setRows] = useState(null as (null | ActivityEntry[]))
-  const [date, setDate] = useState(new Date());
+  const [date, setDate] = useState(fromUnixTime(Math.max(...fileEntries)))
+  const [error, setError] = useState(null)
 
   const filename = getLogFilename(date)
   useEffect(() => {
-    const loadRows = async () => {
-      const rows = await readCsv(filename)
-      setRows(rows)
-    }
 
+    const loadRows = async () => {
+      try {
+        const rows = await readCsv(filename)
+        setRows(rows)
+      } catch (e: any) {
+        setError(e)
+      }
+    }
     setRows(null)
+    setError(null)
     loadRows()
   }, [filename])
 
@@ -193,10 +203,16 @@ function App() {
 
   let chart = null
   if (rows === null) {
-    chart = <>
+    if (error)  {
+      chart = <Alert severity="warning">There is no such file: {filename}</Alert>
+    }
+    else {
+      chart = <>
       <div>Loading {filename}...</div>
       <CircularProgress />
     </>
+    }
+
   } else {
     const data = getChartData(rows, type)
     chart = <Chart
