@@ -14,7 +14,8 @@ def main():
                 exe = entry[3]
                 activities.add(exe)
 
-    print(json.dumps(list(activities)))
+    with open('activities.json', 'wt', encoding='utf-8') as f:
+        json.dump(list(activities), f)
 
 
 
