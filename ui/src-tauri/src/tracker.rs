@@ -2,58 +2,35 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::fs::File;
 
-use anyhow::{anyhow, Result};
-use chrono::{Datelike, NaiveDate, NaiveDateTime, Utc};
+use chrono::{NaiveDate, NaiveDateTime, Utc};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
+use crate::config::Config;
 use crate::activity::{self, Activity};
 
 type ActivityWriter = activity::Writer<File>;
 
-fn month_name(month: u32) -> &'static str {
-    const MONTHS: [&str; 12] = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
-
-    match MONTHS.get(month as usize - 1) {
-        Some(month) => *month,
-        None => "NO_MONTH",
-    }
-}
-
-fn log_file(base_dir: PathBuf, date: NaiveDate) -> PathBuf {
-    let date = format!(
-        "{:02}-{}-{}.csv",
-        date.day(),
-        month_name(date.month()),
-        date.year()
-    );
-    base_dir.join(date)
+fn log_filename(base_dir: PathBuf, date: NaiveDate) -> PathBuf {
+    let date = date.format("%d-%b-%Y");
+    base_dir.join(format!("{}.csv", date))
 }
 
 pub struct Tracker {
+    config: Config,
     base_dir: PathBuf,
     writer: Mutex<ActivityWriter>,
 }
 
 impl Tracker {
-    pub fn new() -> Result<Self> {
-        let base_dir = dirs::home_dir().ok_or_else(|| anyhow!("HOME is not set"))?;
-        let base_dir = base_dir.join("trackme");
-        #[cfg(debug_assertions)]
-        let base_dir = base_dir.join("debug");
-        if !base_dir.exists() {
-            std::fs::create_dir_all(&base_dir)?;
-        }
-
-        let filename = log_file(base_dir.clone(), Utc::now().date_naive());
+    pub fn new(base_dir: PathBuf, config: Config) -> anyhow::Result<Self> {
+        let filename = log_filename(base_dir.clone(), Utc::now().date_naive());
         let writer = ActivityWriter::open(filename)?;
         let writer = Mutex::new(writer);
-        Ok(Tracker { base_dir, writer })
+        Ok(Tracker { base_dir, config, writer })
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&self) -> anyhow::Result<()> {
         let mut now = Utc::now().naive_utc();
         let mut day = now.date();
         let mut next_tick = Instant::now();
@@ -74,8 +51,8 @@ impl Tracker {
         }
     }
 
-    async fn rotate_to(&self, date: NaiveDate) -> Result<()> {
-        let filename = log_file(self.base_dir.clone(), date);
+    async fn rotate_to(&self, date: NaiveDate) -> anyhow::Result<()> {
+        let filename = log_filename(self.base_dir.clone(), date);
         let mut new_writer = ActivityWriter::open(filename)?;
         {
             let mut writer = self.writer.lock().await;
@@ -84,9 +61,16 @@ impl Tracker {
         Ok(())
     }
 
-    async fn track(&self, activity: Activity, time: NaiveDateTime) -> Result<()> {
-        // TODO: idle
-        // TODO: blacklist
+    async fn track(&self, activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
+        // TODO: handle idle
+
+        if let Some(tag) = self.config.tagger.tag(&activity) {
+            if self.config.blacklist.contains(tag) {
+                // do not track blacklisted activities
+                return Ok(());
+            }
+        }
+
         self.writer.lock().await.write(activity, time)?;
         Ok(())
     }

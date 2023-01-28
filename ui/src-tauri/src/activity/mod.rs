@@ -1,9 +1,9 @@
-use std::path::PathBuf;
 use std::cmp::{PartialEq, Eq};
 
 use serde::{Deserialize, Serialize};
 
 mod writer;
+pub mod matcher;
 
 pub use writer::Writer;
 
@@ -12,7 +12,7 @@ type ProcessID = u32;
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Activity {
     pub pid: ProcessID,
-    pub exe: PathBuf,
+    pub exe: String,
     pub title: String,
 }
 
@@ -39,7 +39,6 @@ impl Activity {
             CloseHandle(process);
 
             let exe = String::from_utf16_lossy(&buffer[..n]);
-            let exe = PathBuf::from(exe);
 
             let n = GetWindowTextW(window, &mut buffer) as usize;
             let title = String::from_utf16_lossy(&buffer[..n]);
