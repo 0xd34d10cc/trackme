@@ -17,8 +17,5 @@ def main():
     with open('activities.json', 'wt', encoding='utf-8') as f:
         json.dump(list(activities), f)
 
-
-
-
 if __name__ == '__main__':
     main()
