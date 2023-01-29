@@ -6,3 +6,4 @@ create table if not exists
         exe text,
         title text
     );
+create index if not exists begin_index on activities (begin asc);
