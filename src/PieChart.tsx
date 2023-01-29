@@ -9,7 +9,7 @@ import {
   formatDuration,
 } from "date-fns";
 
-import { ActivityEntry, useActivities } from "./utils";
+import { ActivityEntry, getFilename, useActivities } from "./utils";
 import { CircularProgress } from "@mui/material";
 
 const PieChartColumns: GoogleDataTableColumn[] = [
@@ -26,9 +26,9 @@ function aggregateTime(
     const duration = differenceInSeconds(end, start);
     const current = map.get(exe);
     if (current === undefined) {
-      map.set(exe, duration);
+      map.set(getFilename(exe), duration);
     } else {
-      map.set(exe, current + duration);
+      map.set(getFilename(exe), current + duration);
     }
   }
 

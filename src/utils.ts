@@ -4,6 +4,18 @@ import { add, sub, intervalToDuration } from "date-fns";
 
 export type ActivityEntry = [Date, Date, number, string, string];
 
+export function getFilename(path: string): string {
+  const win = path.split("\\").pop();
+  if (win === undefined) {
+    return "";
+  }
+  const unix = win.split("/").pop();
+  if (unix === undefined) {
+    return "";
+  }
+  return unix;
+}
+
 export async function readActivities(date: Date): Promise<ActivityEntry[]> {
   const duration = intervalToDuration({
     start: 0,

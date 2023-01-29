@@ -1,6 +1,6 @@
 import { CircularProgress } from "@mui/material";
 import Chart, { GoogleDataTableColumn } from "react-google-charts";
-import { ActivityEntry, useActivities } from "./utils";
+import { ActivityEntry, getFilename, useActivities } from "./utils";
 
 const TimelineColumns: GoogleDataTableColumn[] = [
   { type: "string", id: "Executable" },
@@ -12,7 +12,7 @@ const TimelineColumns: GoogleDataTableColumn[] = [
 function buildChartData(rows: ActivityEntry[]): any[] {
   const timelineRows = []
   for (const [start, end, _pid, exe, title] of rows) {
-    timelineRows.push([exe, title, start, end])
+    timelineRows.push([getFilename(exe), title, start, end])
   }
   return [TimelineColumns, ...timelineRows]
 }

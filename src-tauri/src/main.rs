@@ -40,7 +40,7 @@ fn create_tray(app: tauri::AppHandle) -> SystemTray {
                     tauri::WindowUrl::App("index.html".into()),
                 )
                 // TODO: get title from config
-                .title("Trackme UI")
+                .title("Trackme")
                 .build();
                 match status {
                     Ok(_) => {}

@@ -6,7 +6,7 @@
     "devPath": "http://localhost:5173"
   },
   "package": {
-    "productName": "Trackme UI",
+    "productName": "trackme",
     "version": "0.1.0"
   },
   "tauri": {
@@ -61,7 +61,7 @@
         "fullscreen": false,
         "height": 900,
         "resizable": true,
-        "title": "Trackme UI",
+        "title": "Trackme",
         "width": 1600
       }
     ]
