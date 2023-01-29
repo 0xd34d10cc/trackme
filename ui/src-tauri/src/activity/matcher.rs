@@ -5,21 +5,43 @@ use nom::character::complete::one_of;
 use nom::combinator::{map_opt, map_res};
 use nom::multi::fold_many0;
 use nom::sequence::{delimited, pair, preceded, separated_pair};
-use predicates::function::function;
-use predicates::prelude::{Predicate, PredicateBooleanExt, PredicateBoxExt};
-use predicates::str::RegexPredicate;
+use regex::Regex;
 
 use super::Activity;
 
-type InnerMatcher = predicates::BoxPredicate<Activity>;
+pub type VarGetter = fn(&Activity) -> &str;
 
-pub struct Matcher {
-    inner: InnerMatcher
+fn exe_name(activity: &Activity) -> &str {
+    &activity.exe
+}
+
+fn title(activity: &Activity) -> &str {
+    &activity.title
+}
+
+pub enum Matcher {
+    And(Box<Matcher>, Box<Matcher>),
+    Or(Box<Matcher>, Box<Matcher>),
+    Eq(VarGetter, String),
+    NotEq(VarGetter, String),
+    StartsWith(VarGetter, String),
+    Contains(VarGetter, String),
+    EndsWith(VarGetter, String),
+    Matches(VarGetter, Regex),
 }
 
 impl Matcher {
     pub fn matches(&self, activity: &Activity) -> bool {
-        self.inner.eval(activity)
+        match self {
+            Matcher::And(left, right) => left.matches(activity) && right.matches(activity),
+            Matcher::Or(left, right) => left.matches(activity) || right.matches(activity),
+            Matcher::Eq(var, token) => var(activity) == token,
+            Matcher::NotEq(var, token) => var(activity) != token,
+            Matcher::StartsWith(var, token) => var(activity).starts_with(token),
+            Matcher::Contains(var, token) => var(activity).contains(token),
+            Matcher::EndsWith(var, token) => var(activity).ends_with(token),
+            Matcher::Matches(var, re) => re.is_match(var(activity)),
+        }
     }
 }
 
@@ -36,7 +58,7 @@ impl Matcher {
 // Term ::= '\'' .* '\''
 pub fn parse(input: &str) -> anyhow::Result<Matcher> {
     match expr(input) {
-        Ok(("", inner)) => Ok(Matcher { inner }),
+        Ok(("", matcher)) => Ok(matcher),
         Ok((rest, _matcher)) => Err(anyhow!("Incomplete parse: {}", rest)),
         Err(e) => Err(e.to_owned().into()),
     }
@@ -53,87 +75,62 @@ fn key<'a>(word: Input<'a>) -> impl FnMut(Input<'a>) -> Parsed<Input> {
     preceded(space, tag(word))
 }
 
-fn expr(input: Input) -> Parsed<InnerMatcher> {
+fn expr(input: Input) -> Parsed<Matcher> {
     disj(input)
 }
 
-fn disj(input: Input) -> Parsed<InnerMatcher> {
+fn disj(input: Input) -> Parsed<Matcher> {
     let (input, lhs) = conj(input)?;
     let mut lhs = Some(lhs);
     fold_many0(
         preceded(key("or"), conj),
         move || lhs.take().unwrap(),
-        |lhs, rhs| lhs.or(rhs).boxed(),
+        |lhs, rhs| Matcher::Or(Box::new(lhs), Box::new(rhs)),
     )(input)
 }
 
-fn conj(input: Input) -> Parsed<InnerMatcher> {
+fn conj(input: Input) -> Parsed<Matcher> {
     let (input, lhs) = comp(input)?;
     let mut lhs = Some(lhs);
     fold_many0(
         preceded(key("and"), comp),
         move || lhs.take().unwrap(),
-        |lhs, rhs| lhs.or(rhs).boxed(),
+        |lhs, rhs| Matcher::And(Box::new(lhs), Box::new(rhs)),
     )(input)
 }
 
-fn comp(input: Input) -> Parsed<InnerMatcher> {
+fn comp(input: Input) -> Parsed<Matcher> {
     alt((eq, not_eq, starts_with, contains, ends_with, matches))(input)
 }
 
-fn eq(input: Input) -> Parsed<InnerMatcher> {
+fn eq(input: Input) -> Parsed<Matcher> {
     let (rest, (var, term)) = separated_pair(var, key("=="), term)(input)?;
-    let term = term.to_owned();
-    let matcher = function(move |activity| var(activity) == term);
-    Ok((rest, matcher.boxed()))
+    Ok((rest, Matcher::Eq(var, term.to_owned())))
 }
 
-fn not_eq(input: Input) -> Parsed<InnerMatcher> {
+fn not_eq(input: Input) -> Parsed<Matcher> {
     let (rest, (var, term)) = separated_pair(var, key("!="), term)(input)?;
-    let term = term.to_owned();
-    let matcher = function(move |activity| var(activity) != term);
-    Ok((rest, matcher.boxed()))
+    Ok((rest, Matcher::NotEq(var, term.to_owned())))
 }
 
-fn starts_with(input: Input) -> Parsed<InnerMatcher> {
+fn starts_with(input: Input) -> Parsed<Matcher> {
     let (rest, (var, term)) = separated_pair(var, pair(key("starts"), key("with")), term)(input)?;
-    let term = term.to_owned();
-    let matcher = function(move |activity| var(activity).starts_with(&term));
-    Ok((rest, matcher.boxed()))
+    Ok((rest, Matcher::StartsWith(var, term.to_owned())))
 }
 
-fn ends_with(input: Input) -> Parsed<InnerMatcher> {
+fn ends_with(input: Input) -> Parsed<Matcher> {
     let (rest, (var, term)) = separated_pair(var, pair(key("ends"), key("with")), term)(input)?;
-    let term = term.to_owned();
-    let matcher = function(move |activity| var(activity).ends_with(&term));
-    Ok((rest, matcher.boxed()))
+    Ok((rest, Matcher::EndsWith(var, term.to_owned())))
 }
 
-fn contains(input: Input) -> Parsed<InnerMatcher> {
+fn contains(input: Input) -> Parsed<Matcher> {
     let (rest, (var, term)) = separated_pair(var, key("contains"), term)(input)?;
-    let term = term.to_owned();
-    let matcher = function(move |activity| var(activity).contains(&term));
-    Ok((rest, matcher.boxed()))
+    Ok((rest, Matcher::Contains(var, term.to_owned())))
 }
 
-fn regex(input: Input) -> Parsed<RegexPredicate> {
-    map_res(term, |re| predicates::str::is_match(re))(input)
-}
-
-fn matches(input: Input) -> Parsed<InnerMatcher> {
-    let (rest, (var, re)) = separated_pair(var, key("matches"), regex)(input)?;
-    let matcher = function(move |activity| re.eval(var(activity)));
-    Ok((rest, matcher.boxed()))
-}
-
-type VarGetter = fn(&Activity) -> &str;
-
-fn exe_name(activity: &Activity) -> &str {
-    &activity.exe
-}
-
-fn title(activity: &Activity) -> &str {
-    &activity.title
+fn matches(input: Input) -> Parsed<Matcher> {
+    let (rest, (var, re)) = separated_pair(var, key("matches"), map_res(term, Regex::new))(input)?;
+    Ok((rest, Matcher::Matches(var, re)))
 }
 
 fn var(input: Input) -> Parsed<VarGetter> {
@@ -199,7 +196,9 @@ mod tests {
     fn exe_ends_with() {
         let matcher = super::parse("exe ends with 'firefox.exe'").unwrap();
         assert!(matcher.matches(&activity_with_exe("firefox.exe")));
-        assert!(matcher.matches(&activity_with_exe("C:\\Program Files\\firefox\\firefox.exe")));
+        assert!(matcher.matches(&activity_with_exe(
+            "C:\\Program Files\\firefox\\firefox.exe"
+        )));
         assert!(!matcher.matches(&activity_with_exe("C:\\firefox.exe\\actually_a_directory")));
     }
 }

@@ -19,7 +19,7 @@ impl Tagger {
             }
         }
 
-        return None;
+        None
     }
 }
 
