@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::time::Duration;
 
 use chrono::{NaiveDateTime, Utc};
@@ -5,20 +6,22 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::activity::{Activity, Entry as ActivityEntry};
-use crate::config::Config;
 use crate::storage::Storage;
+use crate::tagger::Tagger;
 
 pub struct Tracker<S: Storage> {
     current: Mutex<Option<ActivityEntry>>,
-    config: Config,
+    blacklist: HashSet<String>,
+    tagger: Tagger,
     storage: S,
 }
 
 impl<S: Storage> Tracker<S> {
-    pub fn new(storage: S, config: Config) -> anyhow::Result<Self> {
+    pub fn new(storage: S, blacklist: HashSet<String>, tagger: Tagger) -> anyhow::Result<Self> {
         Ok(Tracker {
             current: Mutex::new(None),
-            config,
+            blacklist,
+            tagger,
             storage,
         })
     }
@@ -40,8 +43,8 @@ impl<S: Storage> Tracker<S> {
     async fn track(&self, activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
         // TODO: handle idle
 
-        if let Some(tag) = self.config.tagger.tag(&activity) {
-            if self.config.blacklist.contains(tag) {
+        if let Some(tag) = self.tagger.tag(&activity) {
+            if self.blacklist.contains(tag) {
                 // do not track blacklisted activities
                 return Ok(());
             }

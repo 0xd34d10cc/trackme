@@ -15,8 +15,10 @@ mod tracker;
 mod storage;
 mod tagger;
 
-use config::Config;
+use config::{Config, StorageDescription};
 use tracker::Tracker;
+
+use crate::config::StorageKind;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -84,10 +86,11 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
     let filename = base_dir.join("config.json");
     let config = match std::fs::read_to_string(filename) {
         Ok(config) => config,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            // TODO: log
-            return Ok(Config::default());
-        }
+        // TODO: create default config
+        // Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+        //     // TODO: log
+        //     return Ok(Config::default());
+        // }
         Err(e) => return Err(e.into()),
     };
 
@@ -95,17 +98,35 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
     Ok(config)
 }
 
-fn create_storage(dir: PathBuf) -> anyhow::Result<Box<dyn Storage>> {
-    use crate::storage::csv;
-    let storage = csv::Storage::open(dir)?;
-    Ok(Box::new(storage))
+fn create_storage(description: StorageDescription) -> anyhow::Result<Box<dyn Storage>> {
+    match description.kind {
+        StorageKind::Csv => {
+            use crate::storage::csv;
+            let location = match description.location {
+                Some(location) => PathBuf::from(location),
+                None => base_dir()?,
+            };
+            let storage = csv::Storage::open(location)?;
+            Ok(Box::new(storage))
+        }
+        StorageKind::Sqlite => {
+            let location = match description.location {
+                Some(location) => PathBuf::from(location),
+                None => base_dir()?.join("data.db"),
+            };
+
+            use crate::storage::sqlite;
+            let storage = sqlite::Storage::open(location)?;
+            Ok(Box::new(storage))
+        }
+    }
 }
 
 async fn run_tracker() -> anyhow::Result<()> {
     let base_dir = base_dir()?;
     let config = parse_config(&base_dir)?;
-    let storage = create_storage(base_dir)?;
-    let tracker = Tracker::new(storage, config)?;
+    let storage = create_storage(config.storage)?;
+    let tracker = Tracker::new(storage, config.blacklist, config.tagger)?;
     tracker.run().await?;
     Ok(())
 }
