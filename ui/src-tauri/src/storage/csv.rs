@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime};
+use serde::{Serialize, Serializer};
 use tokio::sync::Mutex;
-use serde::{Serializer, Serialize};
 
 use crate::activity::{Activity, Entry as ActivityEntry};
 
@@ -30,7 +30,7 @@ impl From<ActivityEntry> for CsvEntry {
         Self {
             begin: entry.begin,
             end: entry.end,
-            activity: entry.activity
+            activity: entry.activity,
         }
     }
 }
@@ -89,7 +89,7 @@ impl super::Storage for Storage {
         if let Some(current) = current.as_mut() {
             if current.date == date {
                 current.write(entry)?;
-                return Ok(())
+                return Ok(());
             }
         }
 
@@ -100,5 +100,15 @@ impl super::Storage for Storage {
         }
 
         Ok(())
+    }
+
+    async fn select(
+        &self,
+        _from: NaiveDateTime,
+        _to: NaiveDateTime,
+    ) -> anyhow::Result<Vec<ActivityEntry>> {
+        Err(anyhow::anyhow!(
+            "select() is not supported for csv format (yet)"
+        ))
     }
 }

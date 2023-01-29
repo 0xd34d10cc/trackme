@@ -1,6 +1,6 @@
 import { CircularProgress } from "@mui/material";
 import Chart, { GoogleDataTableColumn } from "react-google-charts";
-import { ActivityEntry, useLogFile } from "./utils";
+import { ActivityEntry, useActivities } from "./utils";
 
 const TimelineColumns: GoogleDataTableColumn[] = [
   { type: "string", id: "Executable" },
@@ -10,17 +10,25 @@ const TimelineColumns: GoogleDataTableColumn[] = [
 ];
 
 function buildChartData(rows: ActivityEntry[]): any[] {
-  return [TimelineColumns, ...rows];
+  const timelineRows = []
+  for (const [start, end, _pid, exe, title] of rows) {
+    timelineRows.push([exe, title, start, end])
+  }
+  return [TimelineColumns, ...timelineRows]
 }
 
 export default function Timeline({ date }: { date: Date }) {
-  const [data, error] = useLogFile(date)
+  const [data, error] = useActivities(date)
   if (error != null) {
     console.log(error)
   }
 
-  if (data == null) {
+  if (data === null) {
     return <CircularProgress/>
+  }
+
+  if (data.length == 0) {
+    return <>No data</>
   }
 
   return (

@@ -9,7 +9,7 @@ import {
   formatDuration,
 } from "date-fns";
 
-import { ActivityEntry, useLogFile } from "./utils";
+import { ActivityEntry, useActivities } from "./utils";
 import { CircularProgress } from "@mui/material";
 
 const PieChartColumns: GoogleDataTableColumn[] = [
@@ -22,7 +22,7 @@ function aggregateTime(
   rows: ActivityEntry[]
 ): IterableIterator<[string, number]> {
   let map: Map<string, number> = new Map();
-  for (const [exe, _title, start, end] of rows) {
+  for (const [start, end, pid, exe, _title] of rows) {
     const duration = differenceInSeconds(end, start);
     const current = map.get(exe);
     if (current === undefined) {
@@ -46,13 +46,17 @@ function buildChartData(rows: ActivityEntry[]): any[] {
 }
 
 export default function PieChart({ date }: { date: Date }) {
-  const [data, error] = useLogFile(date);
+  const [data, error] = useActivities(date);
   if (error != null) {
     console.log(error)
   }
 
   if (data === null) {
     return <CircularProgress/>
+  }
+
+  if (data.length === 0) {
+    return <>No data</>
   }
 
   return (

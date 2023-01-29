@@ -15,14 +15,7 @@
       "iconAsTemplate": true
     },
     "allowlist": {
-      "all": false,
-      "fs": {
-        "all": true,
-        "scope": [
-          "$HOME/trackme",
-          "$HOME/trackme/*"
-        ]
-      }
+      "all": false
     },
     "bundle": {
       "active": false,

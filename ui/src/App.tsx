@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { readTextFile, BaseDirectory } from '@tauri-apps/api/fs'
 
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
@@ -10,19 +9,19 @@ import PieChart from './PieChart';
 import Timeline from './Timeline';
 import DatePicker from './DatePicker'
 
-async function readActivitySet(): Promise<Set<string>> {
-  const content = await readTextFile('trackme/activities.json', { dir: BaseDirectory.Home })
-  const list = JSON.parse(content) as [string]
-  const set = new Set<string>()
-  for (const activity of list) {
-    set.add(activity)
-  }
+// async function readActivitySet(): Promise<Set<string>> {
+//   const content = await readTextFile('trackme/activities.json', { dir: BaseDirectory.Home })
+//   const list = JSON.parse(content) as [string]
+//   const set = new Set<string>()
+//   for (const activity of list) {
+//     set.add(activity)
+//   }
 
-  return set
-}
+//   return set
+// }
 
 // TODO: move to useEffect()
-const activities = await readActivitySet()
+// const activities = await readActivitySet()
 
 function App() {
   const [date, setDate] = useState(new Date());

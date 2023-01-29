@@ -6,30 +6,30 @@ import {
   DatePicker as BaseDatePicker,
 } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { readDir, BaseDirectory } from "@tauri-apps/api/fs";
+// import { readDir, BaseDirectory } from "@tauri-apps/api/fs";
 import getUnixTime from "date-fns/getUnixTime";
 import React from "react";
 
-async function getAvailableDates(): Promise<Set<number>> {
-  const dates = new Set<number>();
-  const entries = await readDir("trackme", { dir: BaseDirectory.Home });
-  for (const entry of entries) {
-    if (entry.name === undefined) {
-      continue;
-    }
-    const [date, _] = entry.name.split(".");
-    const timepoint = getUnixTime(new Date(date));
-    if (Number.isNaN(timepoint)) {
-      continue;
-    }
-    dates.add(timepoint);
-  }
+// async function getAvailableDates(): Promise<Set<number>> {
+//   const dates = new Set<number>();
+//   const entries = await readDir("trackme", { dir: BaseDirectory.Home });
+//   for (const entry of entries) {
+//     if (entry.name === undefined) {
+//       continue;
+//     }
+//     const [date, _] = entry.name.split(".");
+//     const timepoint = getUnixTime(new Date(date));
+//     if (Number.isNaN(timepoint)) {
+//       continue;
+//     }
+//     dates.add(timepoint);
+//   }
 
-  return dates;
-}
+//   return dates;
+// }
 
 // TODO: move to effect
-const fileEntries = await getAvailableDates();
+// const fileEntries = await getAvailableDates();
 
 interface CustomPickerDayProps extends PickersDayProps<Date> {
   dayIsUnavailable: boolean;
@@ -48,12 +48,13 @@ const renderAvailableDays = (
   selectedDates: Array<Date | null>,
   pickersDayProps: PickersDayProps<Date>
 ) => {
-  const timepoint = getUnixTime(date);
+  // const timepoint = getUnixTime(date);
   return (
     <CustomPickersDay
       {...pickersDayProps}
       disableMargin
-      dayIsUnavailable={!fileEntries.has(timepoint)}
+      // dayIsUnavailable={!fileEntries.has(timepoint)}
+      dayIsUnavailable={false}
     />
   );
 };

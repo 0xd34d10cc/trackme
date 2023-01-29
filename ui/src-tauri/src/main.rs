@@ -4,26 +4,26 @@
 )]
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::anyhow;
+use chrono::NaiveDateTime;
 use storage::Storage;
-use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
+use tauri::{
+    AppHandle, CustomMenuItem, Manager, State, SystemTray, SystemTrayEvent, SystemTrayMenu,
+};
 
 mod activity;
 mod config;
-mod tracker;
 mod storage;
 mod tagger;
+mod tracker;
 
 use config::{Config, StorageDescription};
 use tracker::Tracker;
 
+use crate::activity::Entry as ActivityEntry;
 use crate::config::StorageKind;
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}!", name)
-}
 
 fn create_tray(app: tauri::AppHandle) -> SystemTray {
     let exit = CustomMenuItem::new("exit".to_string(), "Exit");
@@ -98,7 +98,7 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
     Ok(config)
 }
 
-fn create_storage(description: StorageDescription) -> anyhow::Result<Box<dyn Storage>> {
+fn create_storage(description: StorageDescription) -> anyhow::Result<Arc<dyn Storage>> {
     match description.kind {
         StorageKind::Csv => {
             use crate::storage::csv;
@@ -107,7 +107,7 @@ fn create_storage(description: StorageDescription) -> anyhow::Result<Box<dyn Sto
                 None => base_dir()?,
             };
             let storage = csv::Storage::open(location)?;
-            Ok(Box::new(storage))
+            Ok(Arc::new(storage))
         }
         StorageKind::Sqlite => {
             let location = match description.location {
@@ -117,18 +117,49 @@ fn create_storage(description: StorageDescription) -> anyhow::Result<Box<dyn Sto
 
             use crate::storage::sqlite;
             let storage = sqlite::Storage::open(location)?;
-            Ok(Box::new(storage))
+            Ok(Arc::new(storage))
         }
     }
 }
 
-async fn run_tracker() -> anyhow::Result<()> {
+async fn run_tracker(app: AppHandle) -> anyhow::Result<()> {
     let base_dir = base_dir()?;
     let config = parse_config(&base_dir)?;
     let storage = create_storage(config.storage)?;
+    // TODO: check whether it panics on second call
+    app.manage(storage.clone());
     let tracker = Tracker::new(storage, config.blacklist, config.tagger)?;
     tracker.run().await?;
     Ok(())
+}
+
+fn parse_timestamp(timestamp: i64) -> anyhow::Result<NaiveDateTime> {
+    let time = NaiveDateTime::from_timestamp_millis(timestamp)
+        .ok_or_else(|| anyhow!("Invalid timestamp: {}", timestamp))?;
+    Ok(time)
+}
+
+async fn do_select(
+    from: i64,
+    to: i64,
+    storage: State<'_, Arc<dyn Storage>>,
+) -> anyhow::Result<Vec<ActivityEntry>> {
+    let from = parse_timestamp(from)?;
+    let to = parse_timestamp(to)?;
+    let entries = storage.select(from, to).await?;
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn select(
+    from: i64,
+    to: i64,
+    storage: State<'_, Arc<dyn Storage>>,
+) -> Result<Vec<ActivityEntry>, String> {
+    match do_select(from, to, storage).await {
+        Ok(entries) => Ok(entries),
+        Err(e) => Err(format!("{}", e)),
+    }
 }
 
 fn main() {
@@ -138,16 +169,17 @@ fn main() {
             create_tray(handle).build(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![select])
         .build(tauri::generate_context!())
-        .expect("error while running tauri application")
-        .run(|_app_handle, event| match event {
+        .expect("error while building tauri application")
+        .run(|app_handle, event| match event {
             tauri::RunEvent::Ready => {
-                tauri::async_runtime::spawn(async {
+                let handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
                     use std::time::Duration;
 
                     loop {
-                        if let Err(e) = run_tracker().await {
+                        if let Err(e) = run_tracker(handle.clone()).await {
                             eprintln!("Tracker failed: {}", e);
                         }
 
