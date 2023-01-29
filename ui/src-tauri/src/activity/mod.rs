@@ -2,10 +2,11 @@ use std::cmp::{PartialEq, Eq};
 
 use serde::{Deserialize, Serialize};
 
-mod writer;
-pub mod matcher;
+mod entry;
+mod matcher;
 
-pub use writer::Writer;
+pub use entry::Entry;
+pub use matcher::Matcher;
 
 type ProcessID = u32;
 

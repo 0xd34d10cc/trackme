@@ -31,6 +31,14 @@ pub enum Matcher {
 }
 
 impl Matcher {
+    pub fn parse(input: &str) -> anyhow::Result<Self> {
+        match expr(input) {
+            Ok(("", matcher)) => Ok(matcher),
+            Ok((rest, _matcher)) => Err(anyhow!("Incomplete parse: {}", rest)),
+            Err(e) => Err(e.to_owned().into()),
+        }
+    }
+
     pub fn matches(&self, activity: &Activity) -> bool {
         match self {
             Matcher::And(left, right) => left.matches(activity) && right.matches(activity),
@@ -56,14 +64,6 @@ impl Matcher {
 //        | Var 'matches' Term
 // Var ::= 'exe' | 'name'
 // Term ::= '\'' .* '\''
-pub fn parse(input: &str) -> anyhow::Result<Matcher> {
-    match expr(input) {
-        Ok(("", matcher)) => Ok(matcher),
-        Ok((rest, _matcher)) => Err(anyhow!("Incomplete parse: {}", rest)),
-        Err(e) => Err(e.to_owned().into()),
-    }
-}
-
 type Input<'a> = &'a str;
 type Parsed<'a, T> = nom::IResult<Input<'a>, T>;
 
@@ -151,6 +151,7 @@ fn term(input: Input) -> Parsed<Input> {
 
 #[cfg(test)]
 mod tests {
+    use super::Matcher;
     use crate::activity::Activity;
 
     fn activity_with_title(title: &str) -> Activity {
@@ -171,21 +172,21 @@ mod tests {
 
     #[test]
     fn exe_eq() {
-        let matcher = super::parse("exe == 'kekus.exe'").unwrap();
+        let matcher = Matcher::parse("exe == 'kekus.exe'").unwrap();
         assert!(!matcher.matches(&activity_with_title("kekus.exe")));
         assert!(matcher.matches(&activity_with_exe("kekus.exe")));
     }
 
     #[test]
     fn title_eq() {
-        let matcher = super::parse("title == 'kekus'").unwrap();
+        let matcher = Matcher::parse("title == 'kekus'").unwrap();
         assert!(!matcher.matches(&activity_with_exe("kekus")));
         assert!(matcher.matches(&activity_with_title("kekus")));
     }
 
     #[test]
     fn exe_eq_or_title_eq() {
-        let matcher = super::parse("exe == 'kekus.exe' or title == 'kekus'").unwrap();
+        let matcher = Matcher::parse("exe == 'kekus.exe' or title == 'kekus'").unwrap();
         assert!(matcher.matches(&activity_with_exe("kekus.exe")));
         assert!(matcher.matches(&activity_with_title("kekus")));
         assert!(!matcher.matches(&activity_with_exe("alloe.exe")));
@@ -194,7 +195,7 @@ mod tests {
 
     #[test]
     fn exe_ends_with() {
-        let matcher = super::parse("exe ends with 'firefox.exe'").unwrap();
+        let matcher = Matcher::parse("exe ends with 'firefox.exe'").unwrap();
         assert!(matcher.matches(&activity_with_exe("firefox.exe")));
         assert!(matcher.matches(&activity_with_exe(
             "C:\\Program Files\\firefox\\firefox.exe"

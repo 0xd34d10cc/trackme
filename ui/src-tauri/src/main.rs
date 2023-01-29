@@ -6,11 +6,14 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
+use storage::Storage;
 use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
 mod activity;
 mod config;
 mod tracker;
+mod storage;
+mod tagger;
 
 use config::Config;
 use tracker::Tracker;
@@ -66,7 +69,7 @@ fn create_tray(app: tauri::AppHandle) -> SystemTray {
 }
 
 fn base_dir() -> anyhow::Result<PathBuf> {
-    // TODO: make base_dir configurable
+    // TODO: make base_dir configurable via command line parameter
     let base_dir = dirs::home_dir().ok_or_else(|| anyhow!("HOME is not set"))?;
     let base_dir = base_dir.join("trackme");
     #[cfg(debug_assertions)]
@@ -92,10 +95,17 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
     Ok(config)
 }
 
+fn create_storage(dir: PathBuf) -> anyhow::Result<Box<dyn Storage>> {
+    use crate::storage::csv;
+    let storage = csv::Storage::open(dir)?;
+    Ok(Box::new(storage))
+}
+
 async fn run_tracker() -> anyhow::Result<()> {
     let base_dir = base_dir()?;
     let config = parse_config(&base_dir)?;
-    let tracker = Tracker::new(base_dir, config)?;
+    let storage = create_storage(base_dir)?;
+    let tracker = Tracker::new(storage, config)?;
     tracker.run().await?;
     Ok(())
 }
