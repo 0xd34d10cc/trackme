@@ -59,6 +59,7 @@
     "windows": [
       {
         "fullscreen": false,
+        "maximized": true,
         "height": 900,
         "resizable": true,
         "title": "Trackme",

@@ -41,6 +41,8 @@ fn create_tray(app: tauri::AppHandle) -> SystemTray {
                 )
                 // TODO: get title from config
                 .title("Trackme")
+                .focused(true)
+                .maximized(true)
                 .build();
                 match status {
                     Ok(_) => {}
