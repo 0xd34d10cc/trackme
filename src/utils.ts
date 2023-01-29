@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api";
 import { add, sub, intervalToDuration } from "date-fns";
 
-export type ActivityEntry = [Date, Date, number, string, string];
+//                           start   end     pid     exe     title
+export type ActivityEntry = [number, number, number, string, string];
 
 export function getFilename(path: string): string {
   const win = path.split("\\").pop();
@@ -29,8 +30,7 @@ export async function readActivities(date: Date): Promise<ActivityEntry[]> {
     to: nextDay.getTime(),
   }) as ActivityEntry[];
 
-  console.log(`${date} (${day} -> ${nextDay}) =>`)
-  console.log(activities)
+  console.log(`${date} => ${activities.length}`)
   return Promise.resolve(activities);
 }
 

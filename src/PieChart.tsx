@@ -22,13 +22,14 @@ function aggregateTime(
   rows: ActivityEntry[]
 ): IterableIterator<[string, number]> {
   let map: Map<string, number> = new Map();
-  for (const [start, end, pid, exe, _title] of rows) {
-    const duration = differenceInSeconds(end, start);
-    const current = map.get(exe);
+  for (const [start, end, _pid, exe, _title] of rows) {
+    const key = getFilename(exe)
+    const duration = end - start;
+    const current = map.get(key);
     if (current === undefined) {
-      map.set(getFilename(exe), duration);
+      map.set(key, duration);
     } else {
-      map.set(getFilename(exe), current + duration);
+      map.set(key, current + duration);
     }
   }
 
@@ -37,10 +38,10 @@ function aggregateTime(
 
 function buildChartData(rows: ActivityEntry[]): any[] {
   const pieRows = [];
-  for (const [name, seconds] of aggregateTime(rows)) {
-    const duration = intervalToDuration({ start: 0, end: seconds * 1000 });
+  for (const [name, ms] of aggregateTime(rows)) {
+    const duration = intervalToDuration({ start: 0, end: ms });
     const tooltip = name + " - " + formatDuration(duration);
-    pieRows.push([name, seconds, tooltip]);
+    pieRows.push([name, ms / 1000, tooltip]);
   }
   return [PieChartColumns, ...pieRows];
 }
@@ -66,8 +67,6 @@ export default function PieChart({ date }: { date: Date }) {
       options={{
         pieHole: 0.4,
       }}
-      width="100%"
-      height="600px"
       legendToggle
     />
   )
