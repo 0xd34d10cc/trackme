@@ -18,6 +18,7 @@ mod config;
 mod storage;
 mod tagger;
 mod tracker;
+mod idle;
 
 use config::{Config, StorageDescription};
 use tracker::Tracker;

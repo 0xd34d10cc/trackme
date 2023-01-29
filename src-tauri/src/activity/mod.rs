@@ -1,4 +1,4 @@
-use std::cmp::{PartialEq, Eq};
+use std::cmp::{Eq, PartialEq};
 
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +18,14 @@ pub struct Activity {
 }
 
 impl Activity {
+    pub fn idle() -> Activity {
+        Activity {
+            pid: 0,
+            exe: "idle".to_owned(),
+            title: "afk".to_owned(),
+        }
+    }
+
     pub fn current() -> Option<Activity> {
         use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::ProcessStatus::K32GetProcessImageFileNameW;

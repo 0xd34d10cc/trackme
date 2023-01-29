@@ -40,14 +40,18 @@ impl<S: Storage> Tracker<S> {
         }
     }
 
-    async fn track(&self, activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
-        // TODO: handle idle
-
+    async fn track(&self, mut activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
         if let Some(tag) = self.tagger.tag(&activity) {
             if self.blacklist.contains(tag) {
                 // do not track blacklisted activities
                 return Ok(());
             }
+        }
+
+        // TODO: make it configurable
+        const MAX_IDLE_TIME: Duration = Duration::from_secs(300);
+        if crate::idle::time() > MAX_IDLE_TIME  {
+            activity = Activity::idle();
         }
 
         self.write(activity, time).await
