@@ -23,7 +23,7 @@ function aggregateTime(
 ): IterableIterator<[string, number]> {
   let map: Map<string, number> = new Map();
   for (const [start, end, _pid, exe, _title] of rows) {
-    const key = getFilename(exe)
+    const key = getFilename(exe);
     const duration = end - start;
     const current = map.get(key);
     if (current === undefined) {
@@ -36,38 +36,50 @@ function aggregateTime(
   return map.entries();
 }
 
-function buildChartData(rows: ActivityEntry[]): any[] {
+function buildChartData(rows: ActivityEntry[]): {
+  rows: any[];
+  total: Duration;
+} {
   const pieRows = [];
+  let total = 0;
   for (const [name, ms] of aggregateTime(rows)) {
+    total += ms;
     const duration = intervalToDuration({ start: 0, end: ms });
     const tooltip = name + " - " + formatDuration(duration);
     pieRows.push([name, ms / 1000, tooltip]);
   }
-  return [PieChartColumns, ...pieRows];
+
+  const data = [PieChartColumns, ...pieRows];
+  return {
+    rows: data,
+    total: intervalToDuration({ start: 0, end: total })
+  }
 }
 
 export default function PieChart({ date }: { date: Date }) {
   const [data, error] = useActivities(date);
   if (error != null) {
-    console.log(error)
+    console.log(error);
   }
 
   if (data === null) {
-    return <CircularProgress/>
+    return <CircularProgress />;
   }
 
   if (data.length === 0) {
-    return <>No data</>
+    return <>No data</>;
   }
 
+  const { rows, total } = buildChartData(data);
   return (
     <Chart
       chartType={"PieChart"}
-      data={buildChartData(data)}
+      data={rows}
       options={{
+        title: `Total ${formatDuration(total)}`,
         pieHole: 0.4,
       }}
       legendToggle
     />
-  )
+  );
 }
