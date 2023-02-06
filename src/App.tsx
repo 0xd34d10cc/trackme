@@ -16,20 +16,6 @@ const Item = styled(Paper)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
-// async function readActivitySet(): Promise<Set<string>> {
-//   const content = await readTextFile('trackme/activities.json', { dir: BaseDirectory.Home })
-//   const list = JSON.parse(content) as [string]
-//   const set = new Set<string>()
-//   for (const activity of list) {
-//     set.add(activity)
-//   }
-
-//   return set
-// }
-
-// TODO: move to useEffect()
-// const activities = await readActivitySet()
-
 function App() {
   const [date, setDate] = useState(new Date());
   return (

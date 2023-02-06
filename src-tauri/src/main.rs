@@ -15,10 +15,10 @@ use tauri::{
 
 mod activity;
 mod config;
+mod idle;
 mod storage;
 mod tagger;
 mod tracker;
-mod idle;
 
 use config::{Config, StorageDescription};
 use tracker::Tracker;
@@ -165,6 +165,17 @@ async fn select(
     }
 }
 
+#[tauri::command]
+async fn active_dates(storage: State<'_, Arc<dyn Storage>>) -> Result<Vec<i64>, String> {
+    match storage.active_dates().await {
+        Ok(dates) => Ok(dates
+            .into_iter()
+            .map(|date| date.and_hms_opt(0, 0, 0).unwrap().timestamp_millis())
+            .collect()),
+        Err(e) => Err(dbg!(e.to_string())),
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -172,7 +183,7 @@ fn main() {
             create_tray(handle).build(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![select])
+        .invoke_handler(tauri::generate_handler![select, active_dates])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| match event {

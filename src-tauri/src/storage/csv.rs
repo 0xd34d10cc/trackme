@@ -107,8 +107,12 @@ impl super::Storage for Storage {
         _from: NaiveDateTime,
         _to: NaiveDateTime,
     ) -> anyhow::Result<Vec<ActivityEntry>> {
+        Err(anyhow::anyhow!("select() is not implementedfor csv format"))
+    }
+
+    async fn active_dates(&self) -> anyhow::Result<Vec<NaiveDate>> {
         Err(anyhow::anyhow!(
-            "select() is not supported for csv format (yet)"
+            "active_dates() is not implemented for csv format"
         ))
     }
 }
