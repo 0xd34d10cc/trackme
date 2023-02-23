@@ -3,15 +3,22 @@
     windows_subsystem = "windows"
 )]
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-
 use anyhow::anyhow;
 use chrono::NaiveDateTime;
+use std::f32::consts::E;
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::process;
+use std::sync::Arc;
 use storage::Storage;
 use tauri::{
     AppHandle, CustomMenuItem, Manager, State, SystemTray, SystemTrayEvent, SystemTrayMenu,
 };
+
+use tauri::api::notification::Notification;
+
+use windows::Win32::System::Threading;
 
 mod activity;
 mod config;
@@ -30,7 +37,6 @@ fn create_tray(app: tauri::AppHandle) -> SystemTray {
     let exit = CustomMenuItem::new("exit".to_string(), "Exit");
     let show = CustomMenuItem::new("show".to_string(), "Show");
     let tray_menu = SystemTrayMenu::new().add_item(show).add_item(exit);
-
     SystemTray::new()
         .with_menu(tray_menu)
         .on_event(move |event| {
@@ -99,6 +105,50 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
 
     let config: Config = serde_json::from_str(&config)?;
     Ok(config)
+}
+
+fn process_is_running(id: u32) -> bool {
+    unsafe {
+        // check that proccess is still running
+        match windows::Win32::System::Threading::OpenProcess(
+            windows::Win32::System::Threading::PROCESS_ALL_ACCESS,
+            false,
+            id,
+        ) {
+            Ok(handle) => return true,
+            Err(e) => return false,
+        };
+    }
+}
+
+fn is_trackme_running() -> bool {
+    let id = std::process::id();
+    let lock_path = base_dir().unwrap().join(".lock");
+    if !lock_path.exists() {
+        fs::File::create(lock_path.clone()).unwrap();
+        fs::write(lock_path, id.to_string());
+        return false;
+    }
+
+    let mut file = fs::File::open(lock_path.clone()).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+
+    if process_is_running(contents.parse().unwrap()) {
+        return true;
+    }
+
+    fs::write(lock_path, id.to_string());
+
+    return false;
+}
+
+fn create_notification(
+    description: &str,
+    title: &str,
+    id: &str,
+) -> anyhow::Result<(), tauri::api::Error> {
+    return Notification::new(id).title(title).body(description).show();
 }
 
 fn create_storage(description: StorageDescription) -> anyhow::Result<Arc<dyn Storage>> {
@@ -180,6 +230,16 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             let handle = app.handle();
+            if is_trackme_running() {
+                if let Err(e) = create_notification(
+                    "Trackme is already running",
+                    "Trackme",
+                    &app.config().tauri.bundle.identifier,
+                ) {
+                    eprintln!("Notification error: {e}");
+                }
+                process::exit(1);
+            }
             create_tray(handle).build(app)?;
             Ok(())
         })
@@ -193,9 +253,9 @@ fn main() {
                     use std::time::Duration;
 
                     loop {
-                        if let Err(e) = run_tracker(handle.clone()).await {
-                            eprintln!("Tracker failed: {}", e);
-                        }
+                        // if let Err(e) = run_tracker(handle.clone()).await {
+                        //     eprintln!("Tracker failed: {}", e);
+                        // }
 
                         tokio::time::sleep(Duration::from_secs(5)).await;
                     }
