@@ -44,6 +44,7 @@ impl<S: Storage> Tracker<S> {
         if let Some(tag) = self.tagger.tag(&activity) {
             if self.blacklist.contains(tag) {
                 // do not track blacklisted activities
+                self.flush().await?;
                 return Ok(());
             }
         }
@@ -72,6 +73,14 @@ impl<S: Storage> Tracker<S> {
             None => {
                 *current = Some(ActivityEntry::new(activity, time));
             }
+        }
+
+        Ok(())
+    }
+
+    async fn flush(&self) -> anyhow::Result<()> {
+        if let Some(activity) = self.current.lock().await.take() {
+            self.storage.store(activity).await?;
         }
 
         Ok(())
