@@ -1,2 +1,6 @@
-yarn add -D @tauri-apps/cli
-yarn tauri dev
+Dev setup:
+
+```
+$ yarn add -D @tauri-apps/cli
+$ yarn tauri dev
+```
