@@ -8,6 +8,7 @@ import PieChart from "./PieChart";
 import Timeline from "./Timeline";
 import DatePicker from "./DatePicker";
 import "./style.css";
+import { DateRange } from "react-day-picker";
 
 const Item = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
@@ -17,20 +18,21 @@ const Item = styled(Paper)(({ theme }) => ({
 }));
 
 function App() {
-  const [date, setDate] = useState(new Date());
+  // TODO: use custom DateRange type to avoid undefined}
+  const [range, setRange] = useState<DateRange | undefined>({from: new Date(), to: new Date()});
   return (
     <Stack spacing={1} direction={"row"} sx={{ height: "100%", width: "100%" }}>
       <Stack spacing={1} direction={"column"} sx={{ height: "100%", width: "30%" }}>
         <Item sx={{ textAlign: "center" }}>
-          <DatePicker date={date} setDate={setDate} />
+          <DatePicker range={range} setRange={setRange} />
         </Item>
 
         <Item>
-          <PieChart date={date} />
+          <PieChart range={range} />
         </Item>
       </Stack>
       <Item sx={{ width: "100%" }}>
-        <Timeline date={date} />
+        <Timeline range={range} />
       </Item>
     </Stack>
   );

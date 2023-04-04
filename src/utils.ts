@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api";
 import { add, sub, intervalToDuration } from "date-fns";
+import { DateRange } from "react-day-picker";
 
 //                           start   end     pid     exe     title
 export type ActivityEntry = [number, number, number, string, string];
@@ -17,30 +18,34 @@ export function getFilename(path: string): string {
   return unix;
 }
 
-export async function readActivities(date: Date): Promise<ActivityEntry[]> {
+function roundToDay(date: Date): Date {
   const duration = intervalToDuration({
     start: 0,
     end: date.getTime()
   })
   const day = sub(date, { hours: duration.hours, minutes: duration.minutes, seconds: duration.seconds })
-  const nextDay = add(day, { days: 1 })
+  return day
+}
 
+export async function readActivities(range: DateRange): Promise<ActivityEntry[]> {
+  const from = roundToDay(range.from!);
+  const to = add(roundToDay(range.to!), { days: 1 });
   const activities = await invoke("select", {
-    from: day.getTime(),
-    to: nextDay.getTime(),
+    from: from.getTime(),
+    to: to.getTime(),
   }) as ActivityEntry[];
 
-  console.log(`${date} => ${activities.length}`)
+  console.log(`${from} - ${to} => ${activities.length}`)
   return Promise.resolve(activities);
 }
 
-export function useActivities(date: Date): [ActivityEntry[] | null, string | null] {
+export function useActivities(range: DateRange): [ActivityEntry[] | null, string | null] {
   const [rows, setRows] = useState(null as null | ActivityEntry[]);
   const [err, setError] = useState(null);
   useEffect(() => {
     const loadRows = async () => {
       try {
-        const rows = await readActivities(date);
+        const rows = await readActivities(range);
         setRows(rows);
       } catch (e: any) {
         setError(e);
@@ -49,7 +54,7 @@ export function useActivities(date: Date): [ActivityEntry[] | null, string | nul
     setRows(null);
     setError(null);
     loadRows();
-  }, [date]);
+  }, [range.from, range.to]);
 
   return [rows, err];
 }

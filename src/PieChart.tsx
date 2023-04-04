@@ -11,6 +11,7 @@ import {
 
 import { ActivityEntry, getFilename, useActivities } from "./utils";
 import { CircularProgress } from "@mui/material";
+import { DateRange } from "react-day-picker";
 
 const PieChartColumns: GoogleDataTableColumn[] = [
   { type: "string", id: "Executable" },
@@ -56,8 +57,13 @@ function buildChartData(rows: ActivityEntry[]): {
   }
 }
 
-export default function PieChart({ date }: { date: Date }) {
-  const [data, error] = useActivities(date);
+export default function PieChart({ range }: { range: DateRange | undefined }) {
+  if (!range) {
+    console.warn('Date range is undefined')
+    return <></>
+  }
+
+  const [data, error] = useActivities(range);
   if (error != null) {
     console.log(error);
   }
