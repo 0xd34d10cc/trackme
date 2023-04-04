@@ -4,14 +4,12 @@ import {
   GoogleDataTableColumnRoleType,
 } from "react-google-charts";
 import {
-  differenceInSeconds,
   intervalToDuration,
   formatDuration,
 } from "date-fns";
 
-import { ActivityEntry, getFilename, useActivities } from "./utils";
+import { ActivityEntry, getFilename, useActivities, DateRange } from "./utils";
 import { CircularProgress } from "@mui/material";
-import { DateRange } from "react-day-picker";
 
 const PieChartColumns: GoogleDataTableColumn[] = [
   { type: "string", id: "Executable" },
@@ -57,12 +55,7 @@ function buildChartData(rows: ActivityEntry[]): {
   }
 }
 
-export default function PieChart({ range }: { range: DateRange | undefined }) {
-  if (!range) {
-    console.warn('Date range is undefined')
-    return <></>
-  }
-
+export default function PieChart({ range }: { range: DateRange }) {
   const [data, error] = useActivities(range);
   if (error != null) {
     console.log(error);

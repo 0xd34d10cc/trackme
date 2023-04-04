@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { format, getTime, isDate } from "date-fns";
-import { DateRange, DayPicker } from "react-day-picker";
+import { add, format, getTime } from "date-fns";
+import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { invoke } from "@tauri-apps/api";
+import { DateRange } from "./utils";
 
 function today(): number {
   const millisecondsInDay = 24 * 60 * 60 * 1000;
@@ -25,8 +26,8 @@ export default function DatePicker({
   range,
   setRange,
 }: {
-  range: DateRange | undefined;
-  setRange: React.Dispatch<React.SetStateAction<DateRange | undefined>>;
+  range: DateRange;
+  setRange: React.Dispatch<React.SetStateAction<DateRange>>;
 }) {
   const [activeDays, setActiveDays] = useState(null as null | Set<number>);
   const isDayDisabled = (date: Date) => {
@@ -62,7 +63,18 @@ export default function DatePicker({
       disabled={isDayDisabled}
       selected={range}
       footer={footer}
-      onSelect={setRange}
+      onSelect={(r) => {
+        if (r && r.from) {
+          if (r.to) {
+            setRange({ from: r.from, to: r.to });
+          } else {
+            setRange({ from: r.from, to: r.from });
+          }
+        } else {
+          // undefeind is set when user clicks on first day of the range
+          setRange({ from: range.from, to: range.from })
+        }
+      }}
     />
   );
 }

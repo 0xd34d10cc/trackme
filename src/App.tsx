@@ -7,8 +7,8 @@ import { styled } from "@mui/material/styles";
 import PieChart from "./PieChart";
 import Timeline from "./Timeline";
 import DatePicker from "./DatePicker";
+import { DateRange } from "./utils"
 import "./style.css";
-import { DateRange } from "react-day-picker";
 
 const Item = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
@@ -18,8 +18,7 @@ const Item = styled(Paper)(({ theme }) => ({
 }));
 
 function App() {
-  // TODO: use custom DateRange type to avoid undefined}
-  const [range, setRange] = useState<DateRange | undefined>({from: new Date(), to: new Date()});
+  const [range, setRange] = useState<DateRange>({from: new Date(), to: new Date()});
   return (
     <Stack spacing={1} direction={"row"} sx={{ height: "100%", width: "100%" }}>
       <Stack spacing={1} direction={"column"} sx={{ height: "100%", width: "30%" }}>

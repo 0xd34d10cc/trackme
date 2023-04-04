@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api";
 import { add, sub, intervalToDuration } from "date-fns";
-import { DateRange } from "react-day-picker";
 
 //                           start   end     pid     exe     title
 export type ActivityEntry = [number, number, number, string, string];
+
+export interface DateRange {
+  from: Date;
+  to: Date;
+}
 
 export function getFilename(path: string): string {
   const win = path.split("\\").pop();
@@ -21,25 +25,33 @@ export function getFilename(path: string): string {
 function roundToDay(date: Date): Date {
   const duration = intervalToDuration({
     start: 0,
-    end: date.getTime()
-  })
-  const day = sub(date, { hours: duration.hours, minutes: duration.minutes, seconds: duration.seconds })
-  return day
+    end: date.getTime(),
+  });
+  const day = sub(date, {
+    hours: duration.hours,
+    minutes: duration.minutes,
+    seconds: duration.seconds,
+  });
+  return day;
 }
 
-export async function readActivities(range: DateRange): Promise<ActivityEntry[]> {
+export async function readActivities(
+  range: DateRange
+): Promise<ActivityEntry[]> {
   const from = roundToDay(range.from!);
   const to = add(roundToDay(range.to!), { days: 1 });
-  const activities = await invoke("select", {
+  const activities = (await invoke("select", {
     from: from.getTime(),
     to: to.getTime(),
-  }) as ActivityEntry[];
+  })) as ActivityEntry[];
 
-  console.log(`${from} - ${to} => ${activities.length}`)
+  console.log(`${from} - ${to} => ${activities.length}`);
   return Promise.resolve(activities);
 }
 
-export function useActivities(range: DateRange): [ActivityEntry[] | null, string | null] {
+export function useActivities(
+  range: DateRange
+): [ActivityEntry[] | null, string | null] {
   const [rows, setRows] = useState(null as null | ActivityEntry[]);
   const [err, setError] = useState(null);
   useEffect(() => {

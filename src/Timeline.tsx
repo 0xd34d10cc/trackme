@@ -1,7 +1,6 @@
 import { CircularProgress } from "@mui/material";
 import Chart, { GoogleDataTableColumn } from "react-google-charts";
-import { ActivityEntry, getFilename, useActivities } from "./utils";
-import { DateRange } from "react-day-picker";
+import { ActivityEntry, getFilename, useActivities, DateRange } from "./utils";
 
 const TimelineColumns: GoogleDataTableColumn[] = [
   { type: "string", id: "Executable" },
@@ -13,17 +12,17 @@ const TimelineColumns: GoogleDataTableColumn[] = [
 function buildChartData(rows: ActivityEntry[]): any[] {
   const timelineRows = [];
   for (const [start, end, _pid, exe, title] of rows) {
-    timelineRows.push([getFilename(exe), title, start, end]);
+    timelineRows.push([
+      getFilename(exe),
+      title,
+      new Date(start),
+      new Date(end),
+    ]);
   }
   return [TimelineColumns, ...timelineRows];
 }
 
-export default function Timeline({ range }: { range: DateRange | undefined }) {
-  if (!range) {
-    console.warn('Date range is undefined');
-    return <></>
-  }
-
+export default function Timeline({ range }: { range: DateRange }) {
   const [data, error] = useActivities(range);
   if (error != null) {
     console.log(error);
