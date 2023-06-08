@@ -10,6 +10,35 @@ export interface DateRange {
   to: Date;
 }
 
+export function formatDurationShort(duration: Duration): string {
+  let result = "";
+  if (duration.years) {
+    result += `${duration.years}y `;
+  }
+
+  if (duration.months) {
+    result += `${duration.months}mo `;
+  }
+
+  if (duration.days) {
+    result += `${duration.days}d `;
+  }
+
+  if (duration.hours) {
+    result += `${duration.hours}h `;
+  }
+
+  if (duration.minutes) {
+    result += `${duration.minutes}m `;
+  }
+
+  if (duration.seconds) {
+    result += `${duration.seconds}s `;
+  }
+
+  return result.trim();
+}
+
 export function getFilename(path: string): string {
   const win = path.split("\\").pop();
   if (win === undefined) {

@@ -46,7 +46,7 @@ export default function DatePicker({
 
   let footer = <p>Please pick the first day.</p>;
   if (range?.from) {
-    if (!range.to) {
+    if (!range.to || range.from.getTime() === range.to.getTime()) {
       footer = <p>{format(range.from, "PPP")}</p>;
     } else if (range.to) {
       footer = (

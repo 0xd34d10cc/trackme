@@ -3,12 +3,15 @@ import {
   GoogleDataTableColumn,
   GoogleDataTableColumnRoleType,
 } from "react-google-charts";
-import {
-  intervalToDuration,
-  formatDuration,
-} from "date-fns";
+import { intervalToDuration, formatDuration } from "date-fns";
 
-import { ActivityEntry, getFilename, useActivities, DateRange } from "./utils";
+import {
+  ActivityEntry,
+  getFilename,
+  useActivities,
+  DateRange,
+  formatDurationShort,
+} from "./utils";
 import { CircularProgress } from "@mui/material";
 
 const PieChartColumns: GoogleDataTableColumn[] = [
@@ -44,18 +47,24 @@ function buildChartData(rows: ActivityEntry[]): {
   for (const [name, ms] of aggregateTime(rows)) {
     total += ms;
     const duration = intervalToDuration({ start: 0, end: ms });
-    const tooltip = name + " - " + formatDuration(duration);
+    const tooltip = name + " - " + formatDurationShort(duration);
     pieRows.push([name, ms / 1000, tooltip]);
   }
 
   const data = [PieChartColumns, ...pieRows];
   return {
     rows: data,
-    total: intervalToDuration({ start: 0, end: total })
-  }
+    total: intervalToDuration({ start: 0, end: total }),
+  };
 }
 
-export default function PieChart({ range }: { range: DateRange }) {
+export default function PieChart({
+  range,
+  title,
+}: {
+  range: DateRange;
+  title?: string;
+}) {
   const [data, error] = useActivities(range);
   if (error != null) {
     console.log(error);
@@ -74,8 +83,11 @@ export default function PieChart({ range }: { range: DateRange }) {
     <Chart
       chartType={"PieChart"}
       data={rows}
+      height="100%"
       options={{
-        title: `Total ${formatDuration(total)}`,
+        title: title
+          ? `${title} (${formatDurationShort(total)})`
+          : `Total ${formatDurationShort(total)}`,
         pieHole: 0.4,
       }}
       legendToggle
