@@ -7,7 +7,6 @@ use crate::tagger::Tagger;
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StorageKind {
-    Csv,
     Sqlite
 }
 

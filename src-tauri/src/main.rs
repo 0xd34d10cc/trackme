@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use chrono::NaiveDateTime;
@@ -103,15 +104,6 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
 
 fn create_storage(description: StorageDescription) -> anyhow::Result<Arc<dyn Storage>> {
     match description.kind {
-        StorageKind::Csv => {
-            use crate::storage::csv;
-            let location = match description.location {
-                Some(location) => PathBuf::from(location),
-                None => base_dir()?,
-            };
-            let storage = csv::Storage::open(location)?;
-            Ok(Arc::new(storage))
-        }
         StorageKind::Sqlite => {
             let location = match description.location {
                 Some(location) => PathBuf::from(location),
@@ -176,6 +168,33 @@ async fn active_dates(storage: State<'_, Arc<dyn Storage>>) -> Result<Vec<i64>, 
     }
 }
 
+async fn do_duration_by_exe(
+    from: i64,
+    to: i64,
+    storage: State<'_, Arc<dyn Storage>>,
+) -> anyhow::Result<Vec<(String, i64)>> {
+    let from = parse_timestamp(from)?;
+    let to = parse_timestamp(to)?;
+    let durations = storage.duration_by_exe(from, to).await?;
+    let durations = durations
+        .into_iter()
+        .map(|(exe, duration)| (exe, duration.as_millis() as i64))
+        .collect();
+    Ok(durations)
+}
+
+#[tauri::command]
+async fn duration_by_exe(
+    from: i64,
+    to: i64,
+    storage: State<'_, Arc<dyn Storage>>,
+) -> Result<Vec<(String, i64)>, String> {
+    match do_duration_by_exe(from, to, storage).await {
+        Ok(durations) => Ok(durations),
+        Err(e) => Err(dbg!(e.to_string())),
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -183,15 +202,17 @@ fn main() {
             create_tray(handle).build(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![select, active_dates])
+        .invoke_handler(tauri::generate_handler![
+            select,
+            active_dates,
+            duration_by_exe
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| match event {
             tauri::RunEvent::Ready => {
                 let handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    use std::time::Duration;
-
                     loop {
                         if let Err(e) = run_tracker(handle.clone()).await {
                             eprintln!("Tracker failed: {}", e);

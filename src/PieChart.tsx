@@ -3,16 +3,17 @@ import {
   GoogleDataTableColumn,
   GoogleDataTableColumnRoleType,
 } from "react-google-charts";
-import { intervalToDuration, formatDuration } from "date-fns";
+import { intervalToDuration } from "date-fns";
 
 import {
   ActivityEntry,
   getFilename,
-  useActivities,
+  useDurationByExe,
   DateRange,
   formatDurationShort,
 } from "./utils";
 import { CircularProgress } from "@mui/material";
+import { useEffect, useState } from "react";
 
 const PieChartColumns: GoogleDataTableColumn[] = [
   { type: "string", id: "Executable" },
@@ -21,12 +22,11 @@ const PieChartColumns: GoogleDataTableColumn[] = [
 ];
 
 function aggregateTime(
-  rows: ActivityEntry[]
+  rows: [string, number][]
 ): IterableIterator<[string, number]> {
   let map: Map<string, number> = new Map();
-  for (const [start, end, _pid, exe, _title] of rows) {
+  for (const [exe, duration] of rows) {
     const key = getFilename(exe);
-    const duration = end - start;
     const current = map.get(key);
     if (current === undefined) {
       map.set(key, duration);
@@ -38,11 +38,11 @@ function aggregateTime(
   return map.entries();
 }
 
-function buildChartData(rows: ActivityEntry[]): {
+function buildChartData(rows: [string, number][]): {
   rows: any[];
   total: Duration;
 } {
-  const pieRows = [];
+  const pieRows: [string, number, string][] = [];
   let total = 0;
   for (const [name, ms] of aggregateTime(rows)) {
     total += ms;
@@ -51,6 +51,7 @@ function buildChartData(rows: ActivityEntry[]): {
     pieRows.push([name, ms / 1000, tooltip]);
   }
 
+  pieRows.sort((a, b) => b[1] - a[1]);
   const data = [PieChartColumns, ...pieRows];
   return {
     rows: data,
@@ -65,7 +66,7 @@ export default function PieChart({
   range: DateRange;
   title?: string;
 }) {
-  const [data, error] = useActivities(range);
+  const [data, error] = useDurationByExe(range);
   if (error != null) {
     console.log(error);
   }

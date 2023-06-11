@@ -64,9 +64,44 @@ function roundToDay(date: Date): Date {
   return day;
 }
 
-export async function readActivities(
+async function readDurationByExe(
   range: DateRange
-): Promise<ActivityEntry[]> {
+): Promise<[string, number][]> {
+  const from = roundToDay(range.from!);
+  const to = add(roundToDay(range.to!), { days: 1 });
+  const activities = (await invoke("duration_by_exe", {
+    from: from.getTime(),
+    to: to.getTime(),
+  })) as [string, number][];
+
+  console.log(`${from.getTime()} - ${to.getTime()} => ${activities.length}`);
+  console.log(activities);
+  return Promise.resolve(activities);
+}
+
+export function useDurationByExe(
+  range: DateRange
+): [[string, number][] | null, string | null] {
+  const [rows, setRows] = useState(null as null | [string, number][]);
+  const [err, setError] = useState(null);
+  useEffect(() => {
+    const loadRows = async () => {
+      try {
+        const rows = await readDurationByExe(range);
+        setRows(rows);
+      } catch (e: any) {
+        setError(e);
+      }
+    };
+    setRows(null);
+    setError(null);
+    loadRows();
+  }, [range.from, range.to]);
+
+  return [rows, err];
+}
+
+async function readActivities(range: DateRange): Promise<ActivityEntry[]> {
   const from = roundToDay(range.from!);
   const to = add(roundToDay(range.to!), { days: 1 });
   const activities = (await invoke("select", {

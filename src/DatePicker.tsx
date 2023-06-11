@@ -72,7 +72,7 @@ export default function DatePicker({
           }
         } else {
           // undefeind is set when user clicks on first day of the range
-          setRange({ from: range.from, to: range.from })
+          setRange({ from: range.from, to: range.from });
         }
       }}
     />
