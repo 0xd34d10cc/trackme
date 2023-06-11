@@ -27,6 +27,23 @@ use tracker::Tracker;
 use crate::activity::Entry as ActivityEntry;
 use crate::config::StorageKind;
 
+fn create_main_window(app: &AppHandle) {
+    let status = tauri::WindowBuilder::new(app, "main", tauri::WindowUrl::App("index.html".into()))
+        .title("Trackme")
+        .focused(true)
+        .maximized(true)
+        .build();
+    match status {
+        Ok(_) => {}
+        Err(tauri::Error::WindowLabelAlreadyExists(_)) => {
+            if let Some(window) = app.get_window("main") {
+                let _ = window.set_focus();
+            }
+        }
+        Err(e) => panic!("Failed to create window: {}", e),
+    }
+}
+
 fn create_tray(app: tauri::AppHandle) -> SystemTray {
     let exit = CustomMenuItem::new("exit".to_string(), "Exit");
     let show = CustomMenuItem::new("show".to_string(), "Show");
@@ -34,43 +51,20 @@ fn create_tray(app: tauri::AppHandle) -> SystemTray {
 
     SystemTray::new()
         .with_menu(tray_menu)
-        .on_event(move |event| {
-            let create_main_window = || {
-                let status = tauri::WindowBuilder::new(
-                    &app,
-                    "main",
-                    tauri::WindowUrl::App("index.html".into()),
-                )
-                // TODO: get title from config
-                .title("Trackme")
-                .focused(true)
-                .maximized(true)
-                .build();
-                match status {
-                    Ok(_) => {}
-                    Err(tauri::Error::WindowLabelAlreadyExists(_)) => {
-                        if let Some(window) = app.get_window("main") {
-                            let _ = window.set_focus();
-                        }
-                    }
-                    Err(e) => panic!("Failed to create window: {}", e),
+        .on_event(move |event| match event {
+            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+                "exit" => {
+                    app.exit(0);
                 }
-            };
-            match event {
-                SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                    "exit" => {
-                        app.exit(0);
-                    }
-                    "show" => {
-                        create_main_window();
-                    }
-                    _ => {}
-                },
-                SystemTrayEvent::DoubleClick { .. } => {
-                    create_main_window();
+                "show" => {
+                    create_main_window(&app);
                 }
                 _ => {}
+            },
+            SystemTrayEvent::DoubleClick { .. } => {
+                create_main_window(&app);
             }
+            _ => {}
         })
 }
 
@@ -196,6 +190,8 @@ async fn duration_by_exe(
 }
 
 fn main() {
+    let minimized = std::env::args().any(|arg| arg == "--minimized");
+
     tauri::Builder::default()
         .setup(|app| {
             let handle = app.handle();
@@ -209,9 +205,13 @@ fn main() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| match event {
+        .run(move |app, event| match event {
             tauri::RunEvent::Ready => {
-                let handle = app_handle.clone();
+                if !minimized {
+                    create_main_window(app);
+                }
+
+                let handle = app.clone();
                 tauri::async_runtime::spawn(async move {
                     loop {
                         if let Err(e) = run_tracker(handle.clone()).await {
