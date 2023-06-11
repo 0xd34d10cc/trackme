@@ -95,7 +95,6 @@ function multipleDaysLayout(
       };
     });
 
-  // TODO: optimize Pie Chart calculation by using smaller ranges to calculate bigger ones
   const charts = ranges
     .map((range) => <PieChart range={range} title={range.title} />)
     .concat(<PieChart range={totalRange} />)

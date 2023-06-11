@@ -6,19 +6,21 @@ import {
 import { intervalToDuration } from "date-fns";
 
 import {
-  ActivityEntry,
   getFilename,
   useDurationByExe,
   DateRange,
   formatDurationShort,
+  colorOf,
 } from "./utils";
 import { CircularProgress } from "@mui/material";
-import { useEffect, useState } from "react";
 
 const PieChartColumns: GoogleDataTableColumn[] = [
-  { type: "string", id: "Executable" },
-  { type: "number", id: "Length" },
-  { type: "string", role: GoogleDataTableColumnRoleType.tooltip },
+  { type: "string", label: "Executable" },
+  { type: "number", label: "Length" },
+  {
+    type: "string",
+    role: GoogleDataTableColumnRoleType.tooltip,
+  },
 ];
 
 function aggregateTime(
@@ -52,9 +54,8 @@ function buildChartData(rows: [string, number][]): {
   }
 
   pieRows.sort((a, b) => b[1] - a[1]);
-  const data = [PieChartColumns, ...pieRows];
   return {
-    rows: data,
+    rows: pieRows,
     total: intervalToDuration({ start: 0, end: total }),
   };
 }
@@ -83,13 +84,14 @@ export default function PieChart({
   return (
     <Chart
       chartType={"PieChart"}
-      data={rows}
+      data={[PieChartColumns, ...rows]}
       height="100%"
       options={{
         title: title
           ? `${title} (${formatDurationShort(total)})`
           : `Total ${formatDurationShort(total)}`,
         pieHole: 0.4,
+        colors: rows.map((row) => colorOf(row[0])),
       }}
       legendToggle
     />

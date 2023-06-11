@@ -51,6 +51,50 @@ export function getFilename(path: string): string {
   return unix;
 }
 
+export function colorOf(id: string): string {
+  const colors = [
+    "#3366cc",
+    "#dc3912",
+    "#ff9900",
+    "#109618",
+    "#990099",
+    "#0099c6",
+    "#dd4477",
+    "#66aa00",
+    "#b82e2e",
+    "#316395",
+    "#994499",
+    "#22aa99",
+    "#aaaa11",
+    "#6633cc",
+    "#e67300",
+    "#8b0707",
+
+    // "#651067",
+    // "#329262",
+    // "#5574a6",
+    // "#3b3eac",
+    // "#b77322",
+    // "#16d620",
+    // "#b91383",
+    // "#f4359e",
+    // "#9c5935",
+    // "#a9c413",
+    // "#2a778d",
+    // "#668d1c",
+    // "#bea413",
+    // "#0c5922",
+    // "#743411"
+  ]
+
+  const hash = id.split("").reduce((acc, c) => {
+    return c.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0)
+
+  const index = Math.abs(hash % colors.length);
+  return colors[index];
+}
+
 function roundToDay(date: Date): Date {
   const duration = intervalToDuration({
     start: 0,
@@ -74,8 +118,7 @@ async function readDurationByExe(
     to: to.getTime(),
   })) as [string, number][];
 
-  console.log(`${from.getTime()} - ${to.getTime()} => ${activities.length}`);
-  console.log(activities);
+  console.log(`pie ${from.getTime()} - ${to.getTime()} => ${activities.length}`);
   return Promise.resolve(activities);
 }
 
@@ -109,7 +152,7 @@ async function readActivities(range: DateRange): Promise<ActivityEntry[]> {
     to: to.getTime(),
   })) as ActivityEntry[];
 
-  console.log(`${from} - ${to} => ${activities.length}`);
+  console.log(`list ${from.getTime()} - ${to.getTime()} => ${activities.length}`);
   return Promise.resolve(activities);
 }
 
