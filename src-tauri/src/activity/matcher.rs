@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use anyhow::anyhow;
 use nom::branch::alt;
 use nom::bytes::complete::{escaped, tag, take_until};
@@ -9,25 +11,37 @@ use regex::Regex;
 
 use super::Activity;
 
-pub type VarGetter = fn(&Activity) -> &str;
-
-fn exe_name(activity: &Activity) -> &str {
-    &activity.exe
+#[derive(Clone, Copy)]
+pub enum Field {
+    Exe,
+    Title,
 }
 
-fn title(activity: &Activity) -> &str {
-    &activity.title
+impl Field {
+    fn get_from(self, activity: &Activity) -> &str {
+        match self {
+            Field::Exe => &activity.exe,
+            Field::Title => &activity.title,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Field::Exe => "exe",
+            Field::Title => "title",
+        }
+    }
 }
 
 pub enum Matcher {
     And(Box<Matcher>, Box<Matcher>),
     Or(Box<Matcher>, Box<Matcher>),
-    Eq(VarGetter, String),
-    NotEq(VarGetter, String),
-    StartsWith(VarGetter, String),
-    Contains(VarGetter, String),
-    EndsWith(VarGetter, String),
-    Matches(VarGetter, Regex),
+    Eq(Field, String),
+    NotEq(Field, String),
+    StartsWith(Field, String),
+    Contains(Field, String),
+    EndsWith(Field, String),
+    Matches(Field, Regex),
 }
 
 impl Matcher {
@@ -43,12 +57,29 @@ impl Matcher {
         match self {
             Matcher::And(left, right) => left.matches(activity) && right.matches(activity),
             Matcher::Or(left, right) => left.matches(activity) || right.matches(activity),
-            Matcher::Eq(var, token) => var(activity) == token,
-            Matcher::NotEq(var, token) => var(activity) != token,
-            Matcher::StartsWith(var, token) => var(activity).starts_with(token),
-            Matcher::Contains(var, token) => var(activity).contains(token),
-            Matcher::EndsWith(var, token) => var(activity).ends_with(token),
-            Matcher::Matches(var, re) => re.is_match(var(activity)),
+            Matcher::Eq(field, token) => field.get_from(activity) == token,
+            Matcher::NotEq(field, token) => field.get_from(activity) != token,
+            Matcher::StartsWith(field, token) => field.get_from(activity).starts_with(token),
+            Matcher::Contains(field, token) => field.get_from(activity).contains(token),
+            Matcher::EndsWith(field, token) => field.get_from(activity).ends_with(token),
+            Matcher::Matches(field, re) => re.is_match(field.get_from(activity)),
+        }
+    }
+}
+
+impl Display for Matcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Matcher::And(left, right) => write!(f, "{} and {}", left, right),
+            Matcher::Or(left, right) => write!(f, "{} or {}", left, right),
+            Matcher::Eq(field, token) => write!(f, "{} == '{}'", field.name(), token),
+            Matcher::NotEq(field, token) => write!(f, "{} != '{}'", field.name(), token),
+            Matcher::StartsWith(field, token) => {
+                write!(f, "{} starts with '{}'", field.name(), token)
+            }
+            Matcher::Contains(field, token) => write!(f, "{} contains '{}'", field.name(), token),
+            Matcher::EndsWith(field, token) => write!(f, "{} ends with '{}'", field.name(), token),
+            Matcher::Matches(field, re) => write!(f, "{} matches '{}'", field.name(), re.as_str()),
         }
     }
 }
@@ -104,39 +135,41 @@ fn comp(input: Input) -> Parsed<Matcher> {
 }
 
 fn eq(input: Input) -> Parsed<Matcher> {
-    let (rest, (var, term)) = separated_pair(var, key("=="), term)(input)?;
-    Ok((rest, Matcher::Eq(var, term.to_owned())))
+    let (rest, (field, term)) = separated_pair(field, key("=="), term)(input)?;
+    Ok((rest, Matcher::Eq(field, term.to_owned())))
 }
 
 fn not_eq(input: Input) -> Parsed<Matcher> {
-    let (rest, (var, term)) = separated_pair(var, key("!="), term)(input)?;
-    Ok((rest, Matcher::NotEq(var, term.to_owned())))
+    let (rest, (field, term)) = separated_pair(field, key("!="), term)(input)?;
+    Ok((rest, Matcher::NotEq(field, term.to_owned())))
 }
 
 fn starts_with(input: Input) -> Parsed<Matcher> {
-    let (rest, (var, term)) = separated_pair(var, pair(key("starts"), key("with")), term)(input)?;
-    Ok((rest, Matcher::StartsWith(var, term.to_owned())))
+    let (rest, (field, term)) =
+        separated_pair(field, pair(key("starts"), key("with")), term)(input)?;
+    Ok((rest, Matcher::StartsWith(field, term.to_owned())))
 }
 
 fn ends_with(input: Input) -> Parsed<Matcher> {
-    let (rest, (var, term)) = separated_pair(var, pair(key("ends"), key("with")), term)(input)?;
-    Ok((rest, Matcher::EndsWith(var, term.to_owned())))
+    let (rest, (field, term)) = separated_pair(field, pair(key("ends"), key("with")), term)(input)?;
+    Ok((rest, Matcher::EndsWith(field, term.to_owned())))
 }
 
 fn contains(input: Input) -> Parsed<Matcher> {
-    let (rest, (var, term)) = separated_pair(var, key("contains"), term)(input)?;
-    Ok((rest, Matcher::Contains(var, term.to_owned())))
+    let (rest, (field, term)) = separated_pair(field, key("contains"), term)(input)?;
+    Ok((rest, Matcher::Contains(field, term.to_owned())))
 }
 
 fn matches(input: Input) -> Parsed<Matcher> {
-    let (rest, (var, re)) = separated_pair(var, key("matches"), map_res(term, Regex::new))(input)?;
-    Ok((rest, Matcher::Matches(var, re)))
+    let (rest, (field, re)) =
+        separated_pair(field, key("matches"), map_res(term, Regex::new))(input)?;
+    Ok((rest, Matcher::Matches(field, re)))
 }
 
-fn var(input: Input) -> Parsed<VarGetter> {
-    map_opt(alt((key("exe"), key("title"))), |var| match var {
-        "exe" => Some(exe_name as VarGetter),
-        "title" => Some(title as VarGetter),
+fn field(input: Input) -> Parsed<Field> {
+    map_opt(alt((key("exe"), key("title"))), |field| match field {
+        "exe" => Some(Field::Exe),
+        "title" => Some(Field::Title),
         _ => None,
     })(input)
 }

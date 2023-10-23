@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
+use arc_swap::ArcSwap;
 use chrono::NaiveDateTime;
 use storage::Storage;
 use tauri::{
@@ -25,7 +26,6 @@ use config::{Config, StorageDescription};
 use tracker::Tracker;
 
 use crate::activity::Entry as ActivityEntry;
-use crate::config::StorageKind;
 
 fn create_main_window(app: &AppHandle) {
     let status = tauri::WindowBuilder::new(app, "main", tauri::WindowUrl::App("index.html".into()))
@@ -97,27 +97,29 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
 }
 
 fn create_storage(description: StorageDescription) -> anyhow::Result<Arc<dyn Storage>> {
-    match description.kind {
-        StorageKind::Sqlite => {
-            let location = match description.location {
-                Some(location) => PathBuf::from(location),
-                None => base_dir()?.join("data.db"),
-            };
+    let location = match description.location {
+        Some(location) => PathBuf::from(location),
+        None => base_dir()?.join("data.db"),
+    };
 
-            use crate::storage::sqlite;
-            let storage = sqlite::Storage::open(location)?;
-            Ok(Arc::new(storage))
-        }
-    }
+    use crate::storage::sqlite;
+    let storage = sqlite::Storage::open(location)?;
+    Ok(Arc::new(storage))
 }
 
-async fn run_tracker(app: AppHandle) -> anyhow::Result<()> {
-    let base_dir = base_dir()?;
-    let config = parse_config(&base_dir)?;
-    let storage = create_storage(config.storage)?;
-    // TODO: check whether it panics on second call
-    app.manage(storage.clone());
-    let tracker = Tracker::new(storage, config.blacklist, config.tagger)?;
+fn init_state(app: &AppHandle) -> anyhow::Result<()> {
+    let base_dir = base_dir().context("base dir")?;
+    let config = parse_config(&base_dir).context("config")?;
+    let storage = create_storage(config.storage.clone()).context("storage")?;
+
+    app.manage(storage);
+    app.manage(ArcSwap::from_pointee(config));
+    Ok(())
+}
+
+async fn run_tracker(handle: AppHandle) -> anyhow::Result<()> {
+    let storage = handle.state::<Arc<dyn Storage>>().inner().clone();
+    let mut tracker = Tracker::new(storage, handle)?;
     tracker.run().await?;
     Ok(())
 }
@@ -189,6 +191,16 @@ async fn duration_by_exe(
     }
 }
 
+#[tauri::command]
+fn get_config(config: State<'_, ArcSwap<Config>>) -> Arc<Config> {
+    config.load_full()
+}
+
+#[tauri::command]
+fn set_config(new: Config, old: State<'_, ArcSwap<Config>>) {
+    old.swap(Arc::new(new));
+}
+
 fn main() {
     let minimized = std::env::args().any(|arg| arg == "--minimized");
 
@@ -201,7 +213,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             select,
             active_dates,
-            duration_by_exe
+            duration_by_exe,
+            get_config,
+            set_config,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -212,15 +226,31 @@ fn main() {
                 }
 
                 let handle = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    loop {
-                        if let Err(e) = run_tracker(handle.clone()).await {
-                            eprintln!("Tracker failed: {}", e);
-                        }
+                // initialize global state
+                match init_state(app) {
+                    Err(e) => {
+                        use tauri::api::dialog::{
+                            MessageDialogBuilder, MessageDialogButtons, MessageDialogKind,
+                        };
 
-                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        MessageDialogBuilder::new("Startup failed", e.root_cause().to_string())
+                            .buttons(MessageDialogButtons::Ok)
+                            .kind(MessageDialogKind::Error)
+                            .show(move |_| handle.exit(1));
                     }
-                });
+                    Ok(_) => {
+                        // run tracker
+                        tauri::async_runtime::spawn(async move {
+                            loop {
+                                if let Err(e) = run_tracker(handle.clone()).await {
+                                    eprintln!("Tracker failed: {}", e);
+                                }
+
+                                tokio::time::sleep(Duration::from_secs(5)).await;
+                            }
+                        });
+                    }
+                }
             }
             tauri::RunEvent::ExitRequested { api, .. } => {
                 // NOTE: this allows to keep the app running after all windows have been closed

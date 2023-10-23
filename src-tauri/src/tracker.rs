@@ -1,32 +1,35 @@
-use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
+use arc_swap::ArcSwap;
 use chrono::{NaiveDateTime, Utc};
-use tokio::sync::Mutex;
+use tauri::{AppHandle, Manager};
 use tokio::time::Instant;
 
 use crate::activity::{Activity, Entry as ActivityEntry};
+use crate::config::Config;
 use crate::storage::Storage;
-use crate::tagger::Tagger;
 
-pub struct Tracker<S: Storage> {
-    current: Mutex<Option<ActivityEntry>>,
-    blacklist: HashSet<String>,
-    tagger: Tagger,
-    storage: S,
+pub struct Tracker {
+    current: Option<ActivityEntry>,
+
+    handle: AppHandle,
+    storage: Arc<dyn Storage>,
 }
 
-impl<S: Storage> Tracker<S> {
-    pub fn new(storage: S, blacklist: HashSet<String>, tagger: Tagger) -> anyhow::Result<Self> {
+impl Tracker {
+    pub fn new(
+        storage: Arc<dyn Storage>,
+        handle: AppHandle,
+    ) -> anyhow::Result<Self> {
         Ok(Tracker {
-            current: Mutex::new(None),
-            blacklist,
-            tagger,
+            current: None,
+            handle,
             storage,
         })
     }
 
-    pub async fn run(&self) -> anyhow::Result<()> {
+    pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut now = Utc::now().naive_utc();
         let mut next_tick = Instant::now();
         loop {
@@ -40,9 +43,10 @@ impl<S: Storage> Tracker<S> {
         }
     }
 
-    async fn track(&self, mut activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
-        if let Some(tag) = self.tagger.tag(&activity) {
-            if self.blacklist.contains(tag) {
+    async fn track(&mut self, mut activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
+        let config = self.handle.state::<ArcSwap<Config>>().load();
+        if let Some(tag) = config.tagger.tag(&activity) {
+            if config.blacklist.contains(tag) {
                 // do not track blacklisted activities
                 self.flush().await?;
                 return Ok(());
@@ -51,35 +55,31 @@ impl<S: Storage> Tracker<S> {
 
         // TODO: make it configurable
         const MAX_IDLE_TIME: Duration = Duration::from_secs(300);
-        if crate::idle::time() > MAX_IDLE_TIME  {
+        if crate::idle::time() > MAX_IDLE_TIME {
             activity = Activity::idle();
         }
 
         self.write(activity, time).await
     }
 
-    async fn write(&self, activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
-        let mut current = self.current.lock().await;
-        match current.as_mut() {
-            Some(current) => {
-                current.end = time;
-                if current.activity == activity {
-                    return Ok(());
-                }
+    async fn write(&mut self, activity: Activity, time: NaiveDateTime) -> anyhow::Result<()> {
+        if let Some(current) = self.current.as_mut() {
+            current.end = time;
+            if current.activity == activity {
+                return Ok(());
+            }
 
-                let prev = std::mem::replace(current, ActivityEntry::new(activity, time));
-                self.storage.store(prev).await?;
-            }
-            None => {
-                *current = Some(ActivityEntry::new(activity, time));
-            }
+            let prev = std::mem::replace(current, ActivityEntry::new(activity, time));
+            self.storage.store(prev).await?;
+        } else {
+            self.current = Some(ActivityEntry::new(activity, time));
         }
 
         Ok(())
     }
 
-    async fn flush(&self) -> anyhow::Result<()> {
-        if let Some(activity) = self.current.lock().await.take() {
+    async fn flush(&mut self) -> anyhow::Result<()> {
+        if let Some(activity) = self.current.take() {
             self.storage.store(activity).await?;
         }
 
