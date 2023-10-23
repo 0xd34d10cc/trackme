@@ -19,32 +19,6 @@ const Item = styled(Paper)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
-function singleDayLayout(
-  range: DateRange,
-  setRange: React.Dispatch<React.SetStateAction<DateRange>>
-) {
-  return (
-    <Stack spacing={1} direction={"row"} sx={{ height: "100%", width: "100%" }}>
-      <Stack
-        spacing={1}
-        direction={"column"}
-        sx={{ height: "100%", width: "30%" }}
-      >
-        <Item sx={{ textAlign: "center" }}>
-          <DatePicker range={range} setRange={setRange} />
-        </Item>
-
-        <Item>
-          <PieChart range={range} />
-        </Item>
-      </Stack>
-      <Item sx={{ width: "100%" }}>
-        <Timeline range={range} />
-      </Item>
-    </Stack>
-  );
-}
-
 const pieChartRanges = [
   {
     days: 3,
@@ -80,10 +54,15 @@ const pieChartRanges = [
   },
 ];
 
-function multipleDaysLayout(
-  totalRange: DateRange,
-  setRange: React.Dispatch<React.SetStateAction<DateRange>>
-) {
+function singleDayLayout(range: DateRange) {
+  return (
+    <Item sx={{ width: "100%" }}>
+      <Timeline range={range} />
+    </Item>
+  );
+}
+
+function multipleDaysLayout(totalRange: DateRange) {
   const days = differenceInDays(totalRange.to, totalRange.from);
   const ranges = pieChartRanges
     .filter((range) => range.days <= days)
@@ -97,12 +76,33 @@ function multipleDaysLayout(
 
   const charts = ranges
     .map((range) => <PieChart range={range} title={range.title} />)
-    .concat(<PieChart range={totalRange} />)
     .map((chart) => (
       <Grid item>
         <Item>{chart}</Item>{" "}
       </Grid>
     ));
+
+  return (
+    <Grid container spacing={1}>
+      {charts}
+    </Grid>
+  );
+}
+
+function MainArea({ range }: { range: DateRange }) {
+  const days = differenceInDays(range.to, range.from);
+  if (days === 0) {
+    return singleDayLayout(range);
+  }
+
+  return multipleDaysLayout(range);
+}
+
+function App() {
+  const [range, setRange] = useState<DateRange>({
+    from: new Date(),
+    to: new Date(),
+  });
 
   return (
     <Stack spacing={1} direction={"row"} sx={{ height: "100%", width: "100%" }}>
@@ -112,29 +112,17 @@ function multipleDaysLayout(
         sx={{ height: "100%", width: "30%" }}
       >
         <Item sx={{ textAlign: "center" }}>
-          <DatePicker range={totalRange} setRange={setRange} />
+          <DatePicker range={range} setRange={setRange} />
+        </Item>
+
+        <Item>
+          <PieChart range={range} />
         </Item>
       </Stack>
 
-      <Grid container spacing={1}>
-        {charts}
-      </Grid>
+      <MainArea range={range} />
     </Stack>
   );
-}
-
-function App() {
-  const [range, setRange] = useState<DateRange>({
-    from: new Date(),
-    to: new Date(),
-  });
-
-  const days = differenceInDays(range.to, range.from);
-  if (days === 0) {
-    return singleDayLayout(range, setRange);
-  }
-
-  return multipleDaysLayout(range, setRange);
 }
 
 export default App;
