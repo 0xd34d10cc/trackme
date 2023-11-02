@@ -6,8 +6,7 @@ import Divider from "@mui/material/Divider";
 import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
-import InboxIcon from "@mui/icons-material/MoveToInbox";
-import MailIcon from "@mui/icons-material/Mail";
+import Tooltip from "@mui/material/Tooltip";
 import { useState } from "react";
 
 const drawerWidth = 240;
@@ -80,7 +79,7 @@ export default function SideMenu({ items }: { items: MenuItem[] }) {
                     justifyContent: "center",
                   }}
                 >
-                  {item.icon}
+                  <Tooltip title={item.name}>{item.icon}</Tooltip>
                 </ListItemIcon>
               </ListItemButton>
             </ListItem>

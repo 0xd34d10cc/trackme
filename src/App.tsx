@@ -1,21 +1,13 @@
 import "./style.css";
 
-import { AccountBalance } from '@mui/icons-material'
-import { CircularProgress } from '@mui/material'
-
 import { View as AnalyticsView } from './analytics/View';
+import { View as SettingsView } from './settings/View';
 import SideMenu from './SideMenu';
 
 function App() {
-  const EmptyView = {
-    name: "Empty",
-    icon: <AccountBalance/>,
-    component: <CircularProgress/>
-  }
-
   const items = [
     AnalyticsView(),
-    EmptyView,
+    SettingsView(),
   ]
 
   return <SideMenu items={items} />;

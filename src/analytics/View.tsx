@@ -1,24 +1,15 @@
 import { useState } from "react";
 
 import Stack from "@mui/material/Stack";
-import Paper from "@mui/material/Paper";
-import { styled } from "@mui/material/styles";
+import { differenceInDays, subDays } from "date-fns";
+import { Grid } from "@mui/material";
+import { Insights as InsightsIcon } from "@mui/icons-material";
 
+import { Item } from "../Item";
 import PieChart from "./PieChart";
 import Timeline from "./Timeline";
 import DatePicker from "./DatePicker";
 import { DateRange } from "./utils";
-// import "./style.css";
-import { differenceInDays, subDays } from "date-fns";
-import { Grid } from "@mui/material";
-import { AccessTime } from '@mui/icons-material'
-
-const Item = styled(Paper)(({ theme }) => ({
-  backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
-  ...theme.typography.body2,
-  padding: theme.spacing(1),
-  color: theme.palette.text.secondary,
-}));
 
 const pieChartRanges = [
   {
@@ -99,13 +90,13 @@ function MainArea({ range }: { range: DateRange }) {
   return multipleDaysLayout(range);
 }
 
-export function View() {
+function Component() {
   const [range, setRange] = useState<DateRange>({
     from: new Date(),
     to: new Date(),
   });
 
-  const component = (
+  return (
     <Stack spacing={1} direction={"row"} sx={{ height: "100%", width: "100%" }}>
       <Stack
         spacing={1}
@@ -124,12 +115,12 @@ export function View() {
       <MainArea range={range} />
     </Stack>
   );
+}
 
-  const MainView = {
+export function View() {
+  return {
     name: "Explorer",
-    icon: <AccessTime/>,
-    component: component,
-  }
-
-  return MainView;
+    icon: <InsightsIcon />,
+    component: Component(),
+  };
 }
