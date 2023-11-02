@@ -11,6 +11,10 @@ import { DateRange } from "./utils";
 import "./style.css";
 import { differenceInDays, subDays } from "date-fns";
 import { Grid } from "@mui/material";
+import { AccessTime, AccountBalance } from '@mui/icons-material'
+import { CircularProgress } from '@mui/material'
+
+import SideMenu from './SideMenu';
 
 const Item = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
@@ -89,8 +93,6 @@ function multipleDaysLayout(range: DateRange) {
   );
 }
 
-import SideMenu from "./SideMenu";
-
 function MainArea({ range }: { range: DateRange }) {
   const days = differenceInDays(range.to, range.from);
   if (days === 0) {
@@ -106,31 +108,44 @@ function App() {
     to: new Date(),
   });
 
-  return (
-    <SideMenu>
+  const component = (
+    <Stack spacing={1} direction={"row"} sx={{ height: "100%", width: "100%" }}>
       <Stack
         spacing={1}
-        direction={"row"}
-        sx={{ height: "100%", width: "100%" }}
+        direction={"column"}
+        sx={{ height: "100%", width: "30%" }}
       >
-        <Stack
-          spacing={1}
-          direction={"column"}
-          sx={{ height: "100%", width: "30%" }}
-        >
-          <Item sx={{ textAlign: "center" }}>
-            <DatePicker range={range} setRange={setRange} />
-          </Item>
+        <Item sx={{ textAlign: "center" }}>
+          <DatePicker range={range} setRange={setRange} />
+        </Item>
 
-          <Item>
-            <PieChart range={range} />
-          </Item>
-        </Stack>
-
-        <MainArea range={range} />
+        <Item>
+          <PieChart range={range} />
+        </Item>
       </Stack>
-    </SideMenu>
+
+      <MainArea range={range} />
+    </Stack>
   );
+
+  const MainView = {
+    name: "Explorer",
+    icon: <AccessTime/>,
+    component: component,
+  }
+
+  const EmptyView = {
+    name: "Empty",
+    icon: <AccountBalance/>,
+    component: <CircularProgress/>
+  }
+
+  const items = [
+    MainView,
+    EmptyView
+  ]
+
+  return <SideMenu items={items} />;
 }
 
 export default App;

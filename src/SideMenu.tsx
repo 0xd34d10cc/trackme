@@ -8,6 +8,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import InboxIcon from "@mui/icons-material/MoveToInbox";
 import MailIcon from "@mui/icons-material/Mail";
+import { useState } from "react";
 
 const drawerWidth = 240;
 
@@ -49,25 +50,23 @@ const Drawer = styled(MuiDrawer, {
   }),
 }));
 
-type MenuView = {
+type MenuItem = {
   name: string;
-  component: () => JSX.Element;
+  icon: JSX.Element;
+  component: JSX.Element;
 };
 
-// FIXME: there should be a library type for this
-type Props = {
-  children: string | JSX.Element | JSX.Element[];
-};
-
-export default function SideMenu({ children }: Props) {
+export default function SideMenu({ items }: { items: MenuItem[] }) {
+  const [selected, setSelected] = useState(0);
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
       <Drawer variant="permanent" open={false}>
         <Divider />
         <List>
-          {["Inbox", "Starred", "Send email", "Drafts"].map((text, index) => (
-            <ListItem key={text} disablePadding sx={{ display: "block" }}>
+          {items.map((item, index) => (
+            <ListItem key={item.name} disablePadding sx={{ display: "block" }}>
               <ListItemButton
+                onClick={() => setSelected(index)}
                 sx={{
                   minHeight: 48,
                   justifyContent: "initial",
@@ -81,39 +80,16 @@ export default function SideMenu({ children }: Props) {
                     justifyContent: "center",
                   }}
                 >
-                  {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
+                  {item.icon}
                 </ListItemIcon>
               </ListItemButton>
             </ListItem>
           ))}
         </List>
         <Divider />
-        <List>
-          {["All mail", "Trash", "Spam"].map((text, index) => (
-            <ListItem key={text} disablePadding sx={{ display: "block" }}>
-              <ListItemButton
-                sx={{
-                  minHeight: 48,
-                  justifyContent: "initial",
-                  px: 2.5,
-                }}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: 3,
-                    justifyContent: "center",
-                  }}
-                >
-                  {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-                </ListItemIcon>
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1 }}>
-        {children}
+        {items[selected].component}
       </Box>
     </Box>
   );
