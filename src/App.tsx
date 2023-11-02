@@ -62,23 +62,23 @@ function singleDayLayout(range: DateRange) {
   );
 }
 
-function multipleDaysLayout(totalRange: DateRange) {
-  const days = differenceInDays(totalRange.to, totalRange.from);
+function multipleDaysLayout(range: DateRange) {
+  const days = differenceInDays(range.to, range.from);
   const ranges = pieChartRanges
-    .filter((range) => range.days <= days)
+    .filter((r) => r.days <= days)
     .map((r) => {
       return {
-        from: subDays(totalRange.to, r.days),
-        to: totalRange.to,
+        from: subDays(range.to, r.days),
+        to: range.to,
         title: r.label,
       };
     });
 
   const charts = ranges
-    .map((range) => <PieChart range={range} title={range.title} />)
+    .map((r) => <PieChart range={r} title={r.title} />)
     .map((chart) => (
       <Grid item>
-        <Item>{chart}</Item>{" "}
+        <Item>{chart}</Item>
       </Grid>
     ));
 
@@ -88,6 +88,8 @@ function multipleDaysLayout(totalRange: DateRange) {
     </Grid>
   );
 }
+
+import SideMenu from "./SideMenu";
 
 function MainArea({ range }: { range: DateRange }) {
   const days = differenceInDays(range.to, range.from);
@@ -105,23 +107,29 @@ function App() {
   });
 
   return (
-    <Stack spacing={1} direction={"row"} sx={{ height: "100%", width: "100%" }}>
+    <SideMenu>
       <Stack
         spacing={1}
-        direction={"column"}
-        sx={{ height: "100%", width: "30%" }}
+        direction={"row"}
+        sx={{ height: "100%", width: "100%" }}
       >
-        <Item sx={{ textAlign: "center" }}>
-          <DatePicker range={range} setRange={setRange} />
-        </Item>
+        <Stack
+          spacing={1}
+          direction={"column"}
+          sx={{ height: "100%", width: "30%" }}
+        >
+          <Item sx={{ textAlign: "center" }}>
+            <DatePicker range={range} setRange={setRange} />
+          </Item>
 
-        <Item>
-          <PieChart range={range} />
-        </Item>
+          <Item>
+            <PieChart range={range} />
+          </Item>
+        </Stack>
+
+        <MainArea range={range} />
       </Stack>
-
-      <MainArea range={range} />
-    </Stack>
+    </SideMenu>
   );
 }
 
