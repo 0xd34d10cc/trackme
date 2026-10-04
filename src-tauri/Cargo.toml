@@ -20,20 +20,14 @@ arc-swap = "1.9"
 async-trait = "0.1"
 chrono = "0.4"
 dirs = "7.0"
+duckdb = { version = "1.10506", features = ["bundled"] }
 nom = "8.0"
 regex = "1.13"
-rusqlite = { version = "0.40", default-features = false, features = [
-    "bundled",
-    "cache",
-    "series",
-    "vtab"
-] }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tokio = { version = "1.53", default-features = false, features = [
-    "sync",
     "time"
 ] }
 windows = { version = "0.62", features = [
@@ -52,3 +46,13 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+# The `cc` crate builds DuckDB using the profile's opt-level, so `opt-level = "s"`
+# above would compile the native library with -Os (and a debug build would use
+# -O0, making every query in `npm run tauri dev` crawl). Pin the native build to
+# a fully optimized one in both profiles; this does not affect the Rust crates.
+[profile.dev.package.libduckdb-sys]
+opt-level = 3
+
+[profile.release.package.libduckdb-sys]
+opt-level = 3

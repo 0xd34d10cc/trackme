@@ -6,7 +6,7 @@ use chrono::{NaiveDateTime, NaiveDate};
 
 use crate::activity::Entry as ActivityEntry;
 
-pub mod sqlite;
+pub mod duckdb;
 
 #[async_trait]
 pub trait Storage: Sync + Send + 'static {

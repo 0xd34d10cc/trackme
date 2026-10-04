@@ -104,11 +104,11 @@ fn parse_config(base_dir: &Path) -> anyhow::Result<Config> {
 fn create_storage(description: StorageDescription) -> anyhow::Result<Arc<dyn Storage>> {
     let location = match description.location {
         Some(location) => PathBuf::from(location),
-        None => base_dir()?.join("data.db"),
+        None => base_dir()?.join("data.duckdb"),
     };
 
-    use crate::storage::sqlite;
-    let storage = sqlite::Storage::open(location)?;
+    use crate::storage::duckdb;
+    let storage = duckdb::Storage::open(location)?;
     Ok(Arc::new(storage))
 }
 
