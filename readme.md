@@ -1,6 +1,6 @@
 Dev setup:
 
 ```
-$ yarn add -D @tauri-apps/cli
-$ yarn tauri dev
+$ npm install
+$ npm run tauri dev
 ```

@@ -3,7 +3,7 @@ import {
   GoogleDataTableColumn,
   GoogleDataTableColumnRoleType,
 } from "react-google-charts";
-import { intervalToDuration } from "date-fns";
+import { intervalToDuration, type Duration } from "date-fns";
 
 import {
   getFilename,

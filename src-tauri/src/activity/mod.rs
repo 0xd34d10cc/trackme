@@ -36,7 +36,7 @@ impl Activity {
 
         unsafe {
             let window = GetForegroundWindow();
-            if window.0 == 0 {
+            if window.0.is_null() {
                 return None;
             }
 
@@ -45,7 +45,7 @@ impl Activity {
             let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
             let mut buffer = [0u16; 1024];
             let n = K32GetProcessImageFileNameW(process, &mut buffer) as usize;
-            CloseHandle(process);
+            let _ = CloseHandle(process);
 
             let exe = String::from_utf16_lossy(&buffer[..n]);
 

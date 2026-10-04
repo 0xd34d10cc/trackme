@@ -7,6 +7,7 @@ use nom::character::complete::one_of;
 use nom::combinator::{map_opt, map_res};
 use nom::multi::fold_many0;
 use nom::sequence::{delimited, pair, preceded, separated_pair};
+use nom::Parser;
 use regex::Regex;
 
 use super::Activity;
@@ -102,7 +103,9 @@ fn space(s: Input) -> Parsed<Input> {
     nom::character::complete::multispace0(s)
 }
 
-fn key<'a>(word: Input<'a>) -> impl FnMut(Input<'a>) -> Parsed<Input> {
+fn key<'a>(
+    word: Input<'a>,
+) -> impl Parser<Input<'a>, Output = Input<'a>, Error = nom::error::Error<Input<'a>>> {
     preceded(space, tag(word))
 }
 
@@ -117,7 +120,8 @@ fn disj(input: Input) -> Parsed<Matcher> {
         preceded(key("or"), conj),
         move || lhs.take().unwrap(),
         |lhs, rhs| Matcher::Or(Box::new(lhs), Box::new(rhs)),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn conj(input: Input) -> Parsed<Matcher> {
@@ -127,42 +131,44 @@ fn conj(input: Input) -> Parsed<Matcher> {
         preceded(key("and"), comp),
         move || lhs.take().unwrap(),
         |lhs, rhs| Matcher::And(Box::new(lhs), Box::new(rhs)),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn comp(input: Input) -> Parsed<Matcher> {
-    alt((eq, not_eq, starts_with, contains, ends_with, matches))(input)
+    alt((eq, not_eq, starts_with, contains, ends_with, matches)).parse(input)
 }
 
 fn eq(input: Input) -> Parsed<Matcher> {
-    let (rest, (field, term)) = separated_pair(field, key("=="), term)(input)?;
+    let (rest, (field, term)) = separated_pair(field, key("=="), term).parse(input)?;
     Ok((rest, Matcher::Eq(field, term.to_owned())))
 }
 
 fn not_eq(input: Input) -> Parsed<Matcher> {
-    let (rest, (field, term)) = separated_pair(field, key("!="), term)(input)?;
+    let (rest, (field, term)) = separated_pair(field, key("!="), term).parse(input)?;
     Ok((rest, Matcher::NotEq(field, term.to_owned())))
 }
 
 fn starts_with(input: Input) -> Parsed<Matcher> {
     let (rest, (field, term)) =
-        separated_pair(field, pair(key("starts"), key("with")), term)(input)?;
+        separated_pair(field, pair(key("starts"), key("with")), term).parse(input)?;
     Ok((rest, Matcher::StartsWith(field, term.to_owned())))
 }
 
 fn ends_with(input: Input) -> Parsed<Matcher> {
-    let (rest, (field, term)) = separated_pair(field, pair(key("ends"), key("with")), term)(input)?;
+    let (rest, (field, term)) =
+        separated_pair(field, pair(key("ends"), key("with")), term).parse(input)?;
     Ok((rest, Matcher::EndsWith(field, term.to_owned())))
 }
 
 fn contains(input: Input) -> Parsed<Matcher> {
-    let (rest, (field, term)) = separated_pair(field, key("contains"), term)(input)?;
+    let (rest, (field, term)) = separated_pair(field, key("contains"), term).parse(input)?;
     Ok((rest, Matcher::Contains(field, term.to_owned())))
 }
 
 fn matches(input: Input) -> Parsed<Matcher> {
     let (rest, (field, re)) =
-        separated_pair(field, key("matches"), map_res(term, Regex::new))(input)?;
+        separated_pair(field, key("matches"), map_res(term, Regex::new)).parse(input)?;
     Ok((rest, Matcher::Matches(field, re)))
 }
 
@@ -171,7 +177,8 @@ fn field(input: Input) -> Parsed<Field> {
         "exe" => Some(Field::Exe),
         "title" => Some(Field::Title),
         _ => None,
-    })(input)
+    })
+    .parse(input)
 }
 
 fn term(input: Input) -> Parsed<Input> {
@@ -179,7 +186,8 @@ fn term(input: Input) -> Parsed<Input> {
         key("'"),
         escaped(take_until("'"), '\\', one_of("'")),
         tag("'"),
-    )(input)
+    )
+    .parse(input)
 }
 
 #[cfg(test)]

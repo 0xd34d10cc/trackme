@@ -6,32 +6,37 @@ edition = "2021"
 license = ""
 name = "app"
 repository = ""
-rust-version = "1.59"
+rust-version = "1.90"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.2.1", features = [] }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-anyhow = "1.0.68"
-arc-swap = "1.6.0"
-async-trait = "0.1.63"
-chrono = "0.4.23"
-csv = "1.1.6"
-dirs = "4.0.0"
-nom = "7.1.3"
-regex = "1.7.1"
-rusqlite = { version = "0.28.0", default-features = false, features = [
+anyhow = "1.0"
+arc-swap = "1.9"
+async-trait = "0.1"
+chrono = "0.4"
+dirs = "7.0"
+nom = "8.0"
+regex = "1.13"
+rusqlite = { version = "0.40", default-features = false, features = [
     "bundled",
-    "series"
+    "cache",
+    "series",
+    "vtab"
 ] }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
-tauri = { version = "1.2.1", features = ["dialog", "system-tray"] }
-tokio = { version = "1.23.0", default-features = false, features = ["time"] }
-windows = { version = "0.43.0", features = [
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tokio = { version = "1.53", default-features = false, features = [
+    "sync",
+    "time"
+] }
+windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
@@ -39,11 +44,3 @@ windows = { version = "0.43.0", features = [
     "Win32_System_ProcessStatus",
     "Win32_System_SystemInformation",
 ] }
-
-[features]
-# by default Tauri runs in production mode
-# when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
-default = ["custom-protocol"]
-# this feature is used for production builds where `devPath` points to the filesystem
-# DO NOT remove this
-custom-protocol = ["tauri/custom-protocol"]

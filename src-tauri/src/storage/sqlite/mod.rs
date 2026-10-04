@@ -16,7 +16,9 @@ impl Storage {
         const CREATE_TABLE: &str = include_str!("create_table.sql");
 
         let connection = Connection::open(location)?;
-        connection.execute(CREATE_TABLE, ())?;
+        // execute_batch, not execute: create_table.sql holds two statements
+        // (the table and its index), which execute() rejects
+        connection.execute_batch(CREATE_TABLE)?;
         vtab::series::load_module(&connection)?;
         Ok(Storage {
             connection: Mutex::new(connection),

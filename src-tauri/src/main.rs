@@ -11,9 +11,9 @@ use anyhow::{anyhow, Context};
 use arc_swap::ArcSwap;
 use chrono::NaiveDateTime;
 use storage::Storage;
-use tauri::{
-    AppHandle, CustomMenuItem, Manager, State, SystemTray, SystemTrayEvent, SystemTrayMenu,
-};
+use tauri::menu::{Menu, MenuItemBuilder};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Manager, State};
 
 mod activity;
 mod config;
@@ -28,44 +28,49 @@ use tracker::Tracker;
 use crate::activity::Entry as ActivityEntry;
 
 fn create_main_window(app: &AppHandle) {
-    let status = tauri::WindowBuilder::new(app, "main", tauri::WindowUrl::App("index.html".into()))
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_focus();
+        return;
+    }
+
+    tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
         .title("Trackme")
         .focused(true)
         .maximized(true)
-        .build();
-    match status {
-        Ok(_) => {}
-        Err(tauri::Error::WindowLabelAlreadyExists(_)) => {
-            if let Some(window) = app.get_window("main") {
-                let _ = window.set_focus();
-            }
-        }
-        Err(e) => panic!("Failed to create window: {}", e),
-    }
+        .build()
+        .expect("Failed to create window");
 }
 
-fn create_tray(app: tauri::AppHandle) -> SystemTray {
-    let exit = CustomMenuItem::new("exit".to_string(), "Exit");
-    let show = CustomMenuItem::new("show".to_string(), "Show");
-    let tray_menu = SystemTrayMenu::new().add_item(show).add_item(exit);
+fn create_tray(app: &AppHandle) -> tauri::Result<()> {
+    let show = MenuItemBuilder::with_id("show", "Show").build(app)?;
+    let exit = MenuItemBuilder::with_id("exit", "Exit").build(app)?;
+    let menu = Menu::with_items(app, &[&show, &exit])?;
 
-    SystemTray::new()
-        .with_menu(tray_menu)
-        .on_event(move |event| match event {
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                "exit" => {
-                    app.exit(0);
-                }
-                "show" => {
-                    create_main_window(&app);
-                }
-                _ => {}
-            },
-            SystemTrayEvent::DoubleClick { .. } => {
-                create_main_window(&app);
+    let mut tray = TrayIconBuilder::new()
+        .menu(&menu)
+        // reserve left click for restoring the window, as double click does below
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "exit" => {
+                app.exit(0);
+            }
+            "show" => {
+                create_main_window(app);
             }
             _ => {}
         })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::DoubleClick { .. } = event {
+                create_main_window(tray.app_handle());
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+
+    tray.build(app)?;
+    Ok(())
 }
 
 fn base_dir() -> anyhow::Result<PathBuf> {
@@ -205,9 +210,9 @@ fn main() {
     let minimized = std::env::args().any(|arg| arg == "--minimized");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let handle = app.handle();
-            create_tray(handle).build(app)?;
+            create_tray(app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -229,11 +234,13 @@ fn main() {
                 // initialize global state
                 match init_state(app) {
                     Err(e) => {
-                        use tauri::api::dialog::{
-                            MessageDialogBuilder, MessageDialogButtons, MessageDialogKind,
+                        use tauri_plugin_dialog::{
+                            DialogExt, MessageDialogButtons, MessageDialogKind,
                         };
 
-                        MessageDialogBuilder::new("Startup failed", e.root_cause().to_string())
+                        app.dialog()
+                            .message(e.root_cause().to_string())
+                            .title("Startup failed")
                             .buttons(MessageDialogButtons::Ok)
                             .kind(MessageDialogKind::Error)
                             .show(move |_| handle.exit(1));
@@ -252,9 +259,14 @@ fn main() {
                     }
                 }
             }
-            tauri::RunEvent::ExitRequested { api, .. } => {
-                // NOTE: this allows to keep the app running after all windows have been closed
-                api.prevent_exit();
+            tauri::RunEvent::ExitRequested { api, code, .. } => {
+                // Keep running after the last window is closed (tracking
+                // continues in the tray), but honour an explicit exit:
+                // AppHandle::exit(code) also routes through this event with
+                // `code` set, and must not be cancelled.
+                if code.is_none() {
+                    api.prevent_exit();
+                }
             }
             _ => {}
         });

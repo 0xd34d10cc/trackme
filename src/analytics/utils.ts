@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api";
-import { add, sub, intervalToDuration } from "date-fns";
+import { invoke } from "@tauri-apps/api/core";
+import { add, sub, intervalToDuration, type Duration } from "date-fns";
 
 //                           start   end     pid     exe     title
 export type ActivityEntry = [number, number, number, string, string];

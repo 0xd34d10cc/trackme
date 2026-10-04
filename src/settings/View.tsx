@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Settings } from "@mui/icons-material";
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { CircularProgress } from "@mui/material";
 
 // {

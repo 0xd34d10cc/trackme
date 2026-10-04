@@ -69,7 +69,7 @@ function multipleDaysLayout(range: DateRange) {
   const charts = ranges
     .map((r) => <PieChart range={r} title={r.title} />)
     .map((chart) => (
-      <Grid item>
+      <Grid size="auto">
         <Item>{chart}</Item>
       </Grid>
     ));
