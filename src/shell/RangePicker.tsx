@@ -10,6 +10,15 @@ import { pickerPaperSx } from "./pickerStyles";
 const MAX_RANGE_DAYS = 370;
 
 /**
+ * A selection in progress — mirrors day-picker's own `DateRange`, where `from`
+ * is required (though possibly unset) and `to` only appears after the 2nd click.
+ */
+interface DraftRange {
+  from: Date | undefined;
+  to?: Date | undefined;
+}
+
+/**
  * The shared range calendar popover.
  *
  * Unlike the single-day picker, days with no activity are *not* disabled: a
@@ -28,6 +37,24 @@ export function RangePicker({
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const { data: activeDates } = useActiveDates();
 
+  /**
+   * The selection as the calendar is building it.
+   *
+   * This has to live here. Supplying `onSelect` makes DayPicker fully
+   * controlled: it renders whatever `selected` holds and never records the
+   * click itself. Feeding it only the committed range would mean every click
+   * sees a complete range and — with `resetOnSelect` — restarts the selection
+   * at `{ from: clicked, to: undefined }`, so the range could never be
+   * finished. Holding the half-selection lets the second click complete it.
+   */
+  const [draft, setDraft] = useState<DraftRange | undefined>(undefined);
+
+  const committed = (): DraftRange => ({
+    // The picker's upper bound is inclusive; the store's window is half-open.
+    from: new Date(range.from),
+    to: new Date(range.to - DAY_MS),
+  });
+
   const modifiers = useMemo(() => {
     const activeSet = new Set(activeDates ?? []);
     return {
@@ -40,7 +67,12 @@ export function RangePicker({
       <Button
         size="small"
         variant="outlined"
-        onClick={(event) => setAnchorEl(event.currentTarget)}
+        onClick={(event) => {
+          // Start each opening from the range actually in effect, discarding any
+          // half-finished selection from a previous visit.
+          setDraft(committed());
+          setAnchorEl(event.currentTarget);
+        }}
         sx={{ textTransform: "none", fontWeight: 500, minWidth: 220, justifyContent: "center" }}
       >
         {label}
@@ -58,12 +90,14 @@ export function RangePicker({
             numberOfMonths={2}
             max={MAX_RANGE_DAYS}
             resetOnSelect
-            // The picker's upper bound is inclusive; the store's window is half-open.
-            selected={{ from: new Date(range.from), to: new Date(range.to - DAY_MS) }}
+            selected={draft}
             defaultMonth={new Date(range.from)}
             modifiers={modifiers}
             modifiersClassNames={{ hasActivity: "rdp-hasActivity" }}
             onSelect={(next) => {
+              setDraft(next);
+              // Only a finished range is worth applying; the first click just
+              // sets the start and leaves the calendar open.
               if (next?.from && next.to) {
                 onApply(rangeWindow(next.from.getTime(), next.to.getTime() + DAY_MS));
                 setAnchorEl(null);

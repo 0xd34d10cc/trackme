@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DAY_MS } from "../../lib/time";
 import {
+  busiestDay,
   dailyAppStacks,
   focusStats,
   perAppTotals,
   perDayTotals,
-  rollingAverage,
 } from "../history";
 import type { DailyUsageRow } from "../types";
 
@@ -123,13 +123,24 @@ describe("dailyAppStacks", () => {
   });
 });
 
-describe("rollingAverage", () => {
-  it("averages a partial window at the start of the series", () => {
-    expect(rollingAverage([10, 20, 30, 40], 2)).toEqual([10, 15, 25, 35]);
+describe("busiestDay", () => {
+  const days = [DAY0, DAY0 + DAY_MS, DAY0 + 2 * DAY_MS];
+
+  it("returns the largest day with its date", () => {
+    expect(busiestDay(days, [HOUR, 5 * HOUR, 3 * HOUR])).toEqual({
+      dayMs: DAY0 + DAY_MS,
+      activeMs: 5 * HOUR,
+    });
   });
 
-  it("passes values through when the window is one", () => {
-    expect(rollingAverage([1, 2, 3], 1)).toEqual([1, 2, 3]);
+  it("ignores zero days and returns null when nothing was active", () => {
+    expect(busiestDay(days, [0, 0, 0])).toBeNull();
+    expect(busiestDay([], [])).toBeNull();
+    expect(busiestDay(days, [0, 2 * HOUR, 0])?.dayMs).toBe(DAY0 + DAY_MS);
+  });
+
+  it("keeps the earliest day on a tie", () => {
+    expect(busiestDay(days, [HOUR, HOUR, 0])?.dayMs).toBe(DAY0);
   });
 });
 
@@ -150,16 +161,14 @@ describe("focusStats", () => {
 
   it("summarises every application when unfiltered", () => {
     expect(stats(null)).toMatchObject({ activeMs: 6 * HOUR, activeDays: 2, dayCount: 4 });
-    expect(stats(null).perDayMs).toBeCloseTo((6 * HOUR) / 4);
     expect(stats(null).perActiveDayMs).toBeCloseTo((6 * HOUR) / 2);
   });
 
   it("re-bases every figure on one application when filtered", () => {
     expect(stats("alpha.exe")).toMatchObject({ activeMs: 3 * HOUR, activeDays: 2, dayCount: 4 });
-    expect(stats("alpha.exe").perDayMs).toBeCloseTo((3 * HOUR) / 4);
     expect(stats("alpha.exe").perActiveDayMs).toBeCloseTo((3 * HOUR) / 2);
 
-    // beta is busy on a single day only.
+    // beta is busy on a single day only, so its average is its whole total.
     expect(stats("beta.exe")).toMatchObject({ activeMs: 3 * HOUR, activeDays: 1 });
     expect(stats("beta.exe").perActiveDayMs).toBeCloseTo(3 * HOUR);
   });
@@ -168,7 +177,6 @@ describe("focusStats", () => {
     expect(stats("missing.exe")).toMatchObject({
       activeMs: 0,
       activeDays: 0,
-      perDayMs: 0,
       perActiveDayMs: 0,
     });
   });

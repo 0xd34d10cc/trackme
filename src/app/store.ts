@@ -19,8 +19,6 @@ export const DEFAULT_TOP_N = 8;
 
 export type RangePresetValue = RangePreset | "custom";
 
-export const ROLLING_WINDOW_OPTIONS = [7, 14, 30] as const;
-
 interface UiState {
   activeView: ViewId;
   /** Epoch ms of the selected UTC midnight. */
@@ -35,9 +33,6 @@ interface UiState {
   /** The historical range: half-open [from, to), UTC-day aligned. */
   range: DayWindow;
   rangePreset: RangePresetValue;
-  /** UC-05 rolling-average overlay. */
-  rollingAverage: boolean;
-  rollingWindowDays: number;
   /**
    * Application the History chart is filtered to. Null means the stacked view.
    * A selection rather than configuration, so it is not persisted.
@@ -51,13 +46,13 @@ interface UiState {
   setShowIdle: (show: boolean) => void;
   setTopN: (n: number) => void;
   setSelectedApp: (app: string | null) => void;
+  /** Jump to the daily view on the given day — the "open this day" action. */
+  openDay: (ms: number) => void;
 
   setRange: (range: DayWindow, preset?: RangePresetValue) => void;
   setRangePreset: (preset: RangePreset) => void;
   stepRange: (direction: -1 | 1) => void;
 
-  setRollingAverage: (on: boolean) => void;
-  setRollingWindowDays: (days: number) => void;
   setOverviewApp: (app: string | null) => void;
 }
 
@@ -80,8 +75,6 @@ export const useUi = create<UiState>()(
 
       range: presetRange("30d"),
       rangePreset: "30d",
-      rollingAverage: false,
-      rollingWindowDays: 7,
       overviewApp: null,
 
       setActiveView: (activeView) => set({ activeView }),
@@ -96,6 +89,11 @@ export const useUi = create<UiState>()(
       setShowIdle: (showIdle) => set({ showIdle }),
       setTopN: (topN) => set({ topN }),
       setSelectedApp: (selectedApp) => set({ selectedApp }),
+
+      // Same reasoning as `setDate`: the selection belongs to the day we were
+      // looking at, so it is dropped rather than carried across.
+      openDay: (ms) =>
+        set({ date: startOfUtcDay(ms), selectedApp: null, activeView: "daily" }),
 
       // Clamp at the edge so a range can never run into the future or past the
       // query cap; an entirely-future range is ignored rather than applied.
@@ -117,8 +115,6 @@ export const useUi = create<UiState>()(
           return clamped ? { range: clamped, rangePreset: "custom" } : {};
         }),
 
-      setRollingAverage: (rollingAverage) => set({ rollingAverage }),
-      setRollingWindowDays: (rollingWindowDays) => set({ rollingWindowDays }),
       setOverviewApp: (overviewApp) => set({ overviewApp }),
     }),
     {
@@ -132,8 +128,6 @@ export const useUi = create<UiState>()(
         topN: state.topN,
         range: state.range,
         rangePreset: state.rangePreset,
-        rollingAverage: state.rollingAverage,
-        rollingWindowDays: state.rollingWindowDays,
       }),
       // A relative preset ("30d") must mean the last 30 days from *today*, not
       // from whenever the app last closed; a custom range is restored as-is.

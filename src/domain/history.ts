@@ -36,19 +36,49 @@ export interface AppTotal {
   lastDayMs: number;
 }
 
+export interface BusiestDay {
+  dayMs: number;
+  activeMs: number;
+}
+
+/**
+ * The day with the largest value, or null when every day is zero.
+ *
+ * Takes parallel day/value arrays rather than `DayTotal[]` so it works for a
+ * single application's series as well as the whole range — both are exactly the
+ * chart's stack totals.
+ */
+export function busiestDay(
+  days: readonly number[],
+  values: readonly number[],
+): BusiestDay | null {
+  let bestIndex = -1;
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index]!;
+    if (value > 0 && (bestIndex < 0 || value > values[bestIndex]!)) {
+      bestIndex = index;
+    }
+  }
+  if (bestIndex < 0 || days[bestIndex] === undefined) {
+    return null;
+  }
+  return { dayMs: days[bestIndex]!, activeMs: values[bestIndex]! };
+}
+
 /**
  * The headline figures for one focus — everything in the range, or a single
- * application. `dayCount` counts every day in the range (the denominator for
- * the per-day average); `activeDays` counts only the days the focus was
- * actually used.
+ * application. `dayCount` is every day in the range (shown alongside
+ * `activeDays`); `activeDays` counts only the days the focus was used.
  */
 export interface FocusStats {
   activeMs: number;
   activeDays: number;
   dayCount: number;
-  /** `activeMs / dayCount`. */
-  perDayMs: number;
-  /** `activeMs / activeDays`; zero when nothing was active. */
+  /**
+   * `activeMs / activeDays` — the UI labels this "Average per day", since a
+   * day the focus was not used contributes nothing worth averaging over.
+   * Zero when there were no active days.
+   */
   perActiveDayMs: number;
 }
 
@@ -239,25 +269,6 @@ export function dailyAppStacks(
 }
 
 /**
- * Trailing mean over up to `window` points, including the current one. The
- * early points average a partial window, so the line starts on day one instead
- * of after a full window's lag.
- */
-export function rollingAverage(values: readonly number[], window: number): number[] {
-  const size = Math.max(1, Math.floor(window));
-  const out: number[] = [];
-  let sum = 0;
-  for (let index = 0; index < values.length; index += 1) {
-    sum += values[index]!;
-    if (index >= size) {
-      sum -= values[index - size]!;
-    }
-    out.push(sum / Math.min(index + 1, size));
-  }
-  return out;
-}
-
-/**
  * Summarise the current focus over a range.
  *
  * Takes the already-derived tables rather than the raw rows, so switching the
@@ -285,12 +296,10 @@ export function focusStats(
     activeDays = total?.activeDays ?? 0;
   }
 
-  const dayCount = dayTotals.length;
   return {
     activeMs,
     activeDays,
-    dayCount,
-    perDayMs: dayCount > 0 ? activeMs / dayCount : 0,
+    dayCount: dayTotals.length,
     perActiveDayMs: activeDays > 0 ? activeMs / activeDays : 0,
   };
 }

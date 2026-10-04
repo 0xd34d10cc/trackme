@@ -1,15 +1,12 @@
+import { Box } from "@mui/material";
 import type { EChartsCoreOption } from "echarts/core";
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { EChart } from "../../components/EChart";
-import { dailyAppStacks, rollingAverage } from "../../domain/history";
-import type { DailyUsageRow } from "../../domain/types";
+import type { DailyStacks } from "../../domain/history";
 import { OTHER_LABEL } from "../../lib/appIdentity";
 import { formatDayMedium, formatDayShort, formatDuration, formatPercent } from "../../lib/format";
 import { appColor, chromeFor, neutralColor, type ColorMode } from "../../lib/palette";
 import { esc, tooltipStyle } from "./chartTheme";
-
-/** How many applications each day breaks out before folding the rest into "Other". */
-export const STACK_TOP_N = 5;
 
 interface ClickParams {
   componentType?: string;
@@ -23,36 +20,33 @@ interface ClickParams {
 /**
  * UC-05: a stacked bar per day, split by application.
  *
- * Each day picks its own `STACK_TOP_N` busiest applications, so the legend can
+ * Each day picks its own busiest applications (see `STACK_TOP_N` in the view),
+ * so the legend can
  * list far more than that: an application is a segment on the days it is busy
  * and part of that day's "Other" on the rest. Every day's bar still sums to
  * that day's active time. Clicking a segment narrows the chart to that one
  * application (every other series disappears); clicking it again restores the
- * stack. Idle is not stacked — this chart is about where active time went.
+ * stack. Double-clicking a column opens that day in the daily view. Idle is not
+ * stacked — this chart is about where active time went.
  */
 export function HistoryChart({
-  rows,
-  from,
-  to,
+  stacks,
   mode,
   filteredApp,
-  rolling,
-  windowDays,
   onSelectApp,
+  onOpenDay,
 }: {
-  rows: DailyUsageRow[];
-  from: number;
-  to: number;
+  /**
+   * The day-by-application stack. Derived by the view rather than here so the
+   * summary tiles above the chart read the very same object.
+   */
+  stacks: DailyStacks;
   mode: ColorMode;
   filteredApp: string | null;
-  rolling: boolean;
-  windowDays: number;
   onSelectApp: (app: string | null) => void;
+  /** Open a day in the daily view — wired to double-clicking a column. */
+  onOpenDay: (ms: number) => void;
 }) {
-  const stacks = useMemo(
-    () => dailyAppStacks(rows, from, to, STACK_TOP_N, filteredApp),
-    [rows, from, to, filteredApp],
-  );
 
   /**
    * The series the cursor is on, or null over empty space.
@@ -63,6 +57,16 @@ export function HistoryChart({
    * modes — ECharts cannot mix `item` and `axis` triggers on a single one.
    */
   const hoveredSeries = useRef<string | null>(null);
+
+  /**
+   * The day the axis pointer is currently on, or undefined off the grid.
+   *
+   * Written by the tooltip formatter, which runs for a whole column — the bars
+   * and the empty space above them — so a double-click can open a day even
+   * where the bar does not reach. A ref, for the same reason as `hoveredSeries`:
+   * hover must not re-render React.
+   */
+  const hoveredDay = useRef<number | undefined>(undefined);
 
   const option = useMemo<EChartsCoreOption>(() => {
     const chrome = chromeFor(mode);
@@ -82,18 +86,6 @@ export function HistoryChart({
       },
       data: entry.values,
     }));
-
-    if (rolling) {
-      series.push({
-        name: `${windowDays}-day average`,
-        type: "line",
-        symbol: "none",
-        z: 3,
-        lineStyle: { color: chrome.ink, width: 1.5 },
-        itemStyle: { color: chrome.ink },
-        data: rollingAverage(stacks.totals, windowDays),
-      });
-    }
 
     return {
       animation: false,
@@ -154,6 +146,7 @@ export function HistoryChart({
           if (index === undefined) {
             return "";
           }
+          hoveredDay.current = stacks.days[index];
           const day = `<div style="opacity:0.75;margin-bottom:4px">${esc(
             formatDayMedium(stacks.days[index] ?? 0),
           )}</div>`;
@@ -163,11 +156,6 @@ export function HistoryChart({
             hovered === null ? undefined : params.find((param) => param.seriesName === hovered);
 
           if (focused !== undefined) {
-            if (focused.seriesType === "line") {
-              return `${day}<div style="font-weight:600">${esc(
-                focused.seriesName ?? "",
-              )}</div><div>${formatDuration(focused.value ?? 0)}</div>`;
-            }
             const value = focused.value ?? 0;
             const total = stacks.totals[index] ?? 0;
             return [
@@ -199,7 +187,7 @@ export function HistoryChart({
       },
       series,
     };
-  }, [stacks, mode, rolling, windowDays]);
+  }, [stacks, mode]);
 
   const onEvents = useMemo(
     () => ({
@@ -218,8 +206,7 @@ export function HistoryChart({
         hoveredSeries.current = null;
       },
       click: (params: ClickParams) => {
-        // Only a bar segment selects; "Other" is not a single application and
-        // the rolling-average line is not an application at all.
+        // Only a bar segment selects; "Other" is a roll-up, not an application.
         if (params.seriesType !== "bar" || params.seriesName === undefined) {
           return;
         }
@@ -232,5 +219,29 @@ export function HistoryChart({
     [filteredApp, onSelectApp],
   );
 
-  return <EChart option={option} height="100%" onEvents={onEvents} />;
+  /**
+   * A plain DOM double-click rather than ECharts' `dblclick` event.
+   *
+   * ECharts only emits a mouse event when the cursor has a *target element*
+   * (`if (params) trigger(...)`), so a double-click on the empty part of a
+   * column produces no event at all — and in practice the element events were
+   * not arriving either. A React handler on a wrapper around the canvas has no
+   * such dependency: the browser delivers it regardless of what, if anything,
+   * is under the cursor.
+   *
+   * The day comes from `hoveredDay`, which the axis tooltip formatter keeps
+   * current — it runs for a whole column, bars and empty space alike.
+   */
+  const handleDoubleClick = useCallback(() => {
+    const day = hoveredDay.current;
+    if (day !== undefined) {
+      onOpenDay(day);
+    }
+  }, [onOpenDay]);
+
+  return (
+    <Box sx={{ height: "100%" }} onDoubleClick={handleDoubleClick}>
+      <EChart option={option} height="100%" onEvents={onEvents} />
+    </Box>
+  );
 }
