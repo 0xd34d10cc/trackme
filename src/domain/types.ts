@@ -68,6 +68,18 @@ export interface AppUsage {
   isOther?: boolean;
 }
 
+/** One row from `usage_daily`, matching the Rust `DailyUsage` (camelCase). */
+export interface DailyUsageRow {
+  /** UTC midnight of the day, epoch ms. */
+  dayMs: number;
+  /** Raw executable path; the literal `"idle"` for idle blocks. */
+  exe: string;
+  /** Recorded duration, clipped to the queried window. */
+  durationMs: number;
+  /** Number of activity rows on this day for this exe. */
+  intervalCount: number;
+}
+
 export interface DaySummary {
   /** Length of the totalled window: the whole day, or up to "now" for today. */
   windowMs: number;

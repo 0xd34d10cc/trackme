@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use chrono::{NaiveDateTime, NaiveDate};
 
 use crate::activity::Entry as ActivityEntry;
+use crate::analytics::DailyUsage;
 
 pub mod duckdb;
 
@@ -13,6 +14,7 @@ pub trait Storage: Sync + Send + 'static {
     async fn store(&self, activity: ActivityEntry) -> anyhow::Result<()>;
     async fn select(&self, from: NaiveDateTime, to: NaiveDateTime) -> anyhow::Result<Vec<ActivityEntry>>;
     async fn active_dates(&self) -> anyhow::Result<Vec<NaiveDate>>;
+    async fn usage_daily(&self, from: NaiveDateTime, to: NaiveDateTime) -> anyhow::Result<Vec<DailyUsage>>;
 }
 
 #[async_trait]
@@ -28,6 +30,10 @@ impl Storage for Box<dyn Storage> {
     async fn active_dates(&self) -> anyhow::Result<Vec<NaiveDate>> {
         self.deref().active_dates().await
     }
+
+    async fn usage_daily(&self, from: NaiveDateTime, to: NaiveDateTime) -> anyhow::Result<Vec<DailyUsage>> {
+        self.deref().usage_daily(from, to).await
+    }
 }
 
 #[async_trait]
@@ -42,5 +48,9 @@ impl Storage for Arc<dyn Storage> {
 
     async fn active_dates(&self) -> anyhow::Result<Vec<NaiveDate>> {
         self.deref().active_dates().await
+    }
+
+    async fn usage_daily(&self, from: NaiveDateTime, to: NaiveDateTime) -> anyhow::Result<Vec<DailyUsage>> {
+        self.deref().usage_daily(from, to).await
     }
 }

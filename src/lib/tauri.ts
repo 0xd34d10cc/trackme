@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ActivityEntry } from "../domain/types";
-import { MOCK_CONFIG, mockActiveDates, mockSelect } from "./mock";
+import type { ActivityEntry, DailyUsageRow } from "../domain/types";
+import { MOCK_CONFIG, mockActiveDates, mockSelect, mockUsageDaily } from "./mock";
 
 /** The config JSON shape, mirroring Rust's `Config` (matchers is `flatten`ed). */
 export interface Config {
@@ -25,6 +25,17 @@ export const api = {
       return mockSelect(from, to);
     }
     return invoke<ActivityEntry[]>("select", { from, to });
+  },
+
+  /**
+   * Per (UTC day, exe) recorded duration over [from, to). Idle is the row with
+   * `exe === "idle"`. One round trip serves a whole range, however long.
+   */
+  async usageDaily(from: number, to: number): Promise<DailyUsageRow[]> {
+    if (!inTauri()) {
+      return mockUsageDaily(from, to);
+    }
+    return invoke<DailyUsageRow[]>("usage_daily", { from, to });
   },
 
   /** UTC-midnight epoch ms for every day that has recorded activity. */

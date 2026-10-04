@@ -1,17 +1,25 @@
-import { Insights, Settings as SettingsIcon } from "@mui/icons-material";
+import { Insights, Settings as SettingsIcon, Timeline } from "@mui/icons-material";
 import type { ComponentType, ReactNode } from "react";
 import { DailyView } from "../features/daily/DailyView";
+import { HistoryView } from "../features/history/HistoryView";
 import { SettingsView } from "../features/settings/SettingsView";
 import type { ViewId } from "./store";
+
+/**
+ * Which shared header control a route opts into.
+ *
+ * - `none`  — no navigation chrome
+ * - `day`   — the single-day navigator (`DateNavBar`)
+ * - `range` — the shared range navigator (`RangeNavBar`)
+ */
+export type RouteScope = "none" | "day" | "range";
 
 export interface RouteDef {
   id: ViewId;
   label: string;
   icon: ReactNode;
-  /** Sidebar section. Future use cases slot into these without shell changes. */
-  group: string;
-  /** Whether the header shows the shared date navigator. */
-  dateScoped: boolean;
+  /** The header control this route gets. */
+  scope: RouteScope;
   Component: ComponentType;
 }
 
@@ -20,24 +28,29 @@ export interface RouteDef {
  *
  * Components are stored as types rather than pre-built elements: the old
  * `View()` factories constructed every view on every render, and an array index
- * is not a stable identity. `dateScoped` is the hook the ~20 remaining use
- * cases will use to opt into the date bar.
+ * is not a stable identity. The sidebar lists the routes in order and the header
+ * reads `scope`, so neither needs editing when a view is added here.
  */
 export const routes: RouteDef[] = [
   {
     id: "daily",
     label: "Daily",
     icon: <Insights fontSize="small" />,
-    group: "Activity",
-    dateScoped: true,
+    scope: "day",
     Component: DailyView,
+  },
+  {
+    id: "history",
+    label: "History",
+    icon: <Timeline fontSize="small" />,
+    scope: "range",
+    Component: HistoryView,
   },
   {
     id: "settings",
     label: "Settings",
     icon: <SettingsIcon fontSize="small" />,
-    group: "System",
-    dateScoped: false,
+    scope: "none",
     Component: SettingsView,
   },
 ];

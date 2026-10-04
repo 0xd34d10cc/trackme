@@ -1,4 +1,4 @@
-import type { ActivityEntry } from "../domain/types";
+import type { ActivityEntry, DailyUsageRow } from "../domain/types";
 import { DAY_MS } from "./time";
 
 /**
@@ -82,6 +82,54 @@ export function mockSelect(from: number, to: number): ActivityEntry[] {
   return entries
     .filter(([begin, end]) => end > from && begin < to)
     .sort((a, b) => a[0] - b[0]);
+}
+
+/**
+ * The range counterpart of `mockSelect`, for the historical views.
+ *
+ * Deliberately synthesised day-by-day rather than aggregated from `mockSelect`
+ * — that only ever builds a single day and ignores `to`, so calling it over a
+ * range would be both wrong and needlessly slow in the browser dev build. The
+ * per-day seed keeps a given date identical across reloads.
+ */
+export function mockUsageDaily(from: number, to: number): DailyUsageRow[] {
+  const rows: DailyUsageRow[] = [];
+  const start = from - (from % DAY_MS);
+  const workStart = 7 * HOUR;
+  const workEnd = 23 * HOUR;
+  const span = workEnd - workStart;
+
+  for (let day = start; day < to; day += DAY_MS) {
+    const rand = mulberry32(day / DAY_MS);
+    if (rand() < 0.08) {
+      // An untracked day — absent from the table, which is not the same as zero.
+      continue;
+    }
+
+    const idleMs = Math.floor(span * (0.05 + rand() * 0.2));
+    rows.push({
+      dayMs: day,
+      exe: "idle",
+      durationMs: idleMs,
+      intervalCount: 1 + Math.floor(rand() * 3),
+    });
+
+    let remaining = span - idleMs;
+    const count = 3 + Math.floor(rand() * 4);
+    for (let i = 0; i < count && remaining > 0; i += 1) {
+      const app = APPS[Math.floor(rand() * APPS.length)]!;
+      const share = i === count - 1 ? remaining : Math.floor(remaining * (0.15 + rand() * 0.35));
+      rows.push({
+        dayMs: day,
+        exe: app.exe,
+        durationMs: share,
+        intervalCount: 1 + Math.floor(rand() * 5),
+      });
+      remaining -= share;
+    }
+  }
+
+  return rows;
 }
 
 export function mockActiveDates(): number[] {

@@ -5,13 +5,12 @@ import {
   List,
   ListItemButton,
   ListItemIcon,
-  ListSubheader,
   Stack,
   Tooltip,
   Typography,
 } from "@mui/material";
 import { useColorScheme } from "@mui/material/styles";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { routes } from "../app/routes";
 import { useUi } from "../app/store";
 
@@ -19,31 +18,18 @@ const EXPANDED_WIDTH = 224;
 const COLLAPSED_WIDTH = 60;
 
 /**
- * Grouped, collapsible navigation.
+ * The navigation rail.
  *
- * Replaces the old drawer that was hard-coded `open={false}` with labels that
- * never rendered. Grouping and the route table are what let this grow to the
- * ~20 remaining destinations without restructuring the shell.
+ * Collapsed to icons by default — three destinations do not need a labelled
+ * rail taking up a fifth of the window — and the labels are recovered by
+ * hovering, so nothing is lost when it is closed.
  */
 export function Sidebar() {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const activeView = useUi((state) => state.activeView);
   const setActiveView = useUi((state) => state.setActiveView);
   const scheme = useColorScheme();
   const mode = scheme?.mode === "light" ? "light" : "dark";
-
-  const groups = useMemo(() => {
-    const map = new Map<string, typeof routes>();
-    for (const route of routes) {
-      const bucket = map.get(route.group);
-      if (bucket) {
-        bucket.push(route);
-      } else {
-        map.set(route.group, [route]);
-      }
-    }
-    return [...map.entries()];
-  }, []);
 
   return (
     <Box
@@ -71,7 +57,11 @@ export function Sidebar() {
           flex: "0 0 auto",
         }}
       >
-        <IconButton size="small" onClick={() => setOpen((value) => !value)} title={open ? "Collapse" : "Expand"}>
+        <IconButton
+          size="small"
+          onClick={() => setOpen((value) => !value)}
+          title={open ? "Collapse" : "Expand"}
+        >
           <MenuIcon fontSize="small" />
         </IconButton>
         {open && (
@@ -82,69 +72,46 @@ export function Sidebar() {
       </Stack>
 
       <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", py: 0.5 }}>
-        {groups.map(([group, items]) => (
-          <List
-            key={group}
-            dense
-            disablePadding
-            subheader={
-              open ? (
-                <ListSubheader
-                  disableSticky
+        <List dense disablePadding>
+          {routes.map((route) => {
+            const selected = route.id === activeView;
+            const button = (
+              <ListItemButton
+                selected={selected}
+                onClick={() => setActiveView(route.id)}
+                sx={{ minHeight: 38, justifyContent: "center", px: 1.5 }}
+              >
+                <ListItemIcon
                   sx={{
-                    bgcolor: "transparent",
-                    lineHeight: "26px",
-                    fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                    color: "text.secondary",
+                    minWidth: 0,
+                    mr: open ? 1.5 : 0,
+                    justifyContent: "center",
+                    color: selected ? "primary.main" : "text.secondary",
                   }}
                 >
-                  {group}
-                </ListSubheader>
-              ) : undefined
-            }
-          >
-            {items.map((route) => {
-              const selected = route.id === activeView;
-              const button = (
-                <ListItemButton
-                  selected={selected}
-                  onClick={() => setActiveView(route.id)}
-                  sx={{ minHeight: 38, justifyContent: "center", px: 1.5 }}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 0,
-                      mr: open ? 1.5 : 0,
-                      justifyContent: "center",
-                      color: selected ? "primary.main" : "text.secondary",
-                    }}
+                  {route.icon}
+                </ListItemIcon>
+                {open && (
+                  <Typography
+                    variant="body2"
+                    noWrap
+                    sx={{ fontWeight: selected ? 600 : 400, color: "text.primary" }}
                   >
-                    {route.icon}
-                  </ListItemIcon>
-                  {open && (
-                    <Typography
-                      variant="body2"
-                      noWrap
-                      sx={{ fontWeight: selected ? 600 : 400, color: "text.primary" }}
-                    >
-                      {route.label}
-                    </Typography>
-                  )}
-                </ListItemButton>
-              );
+                    {route.label}
+                  </Typography>
+                )}
+              </ListItemButton>
+            );
 
-              return open ? (
-                <Box key={route.id}>{button}</Box>
-              ) : (
-                <Tooltip key={route.id} title={route.label} placement="right">
-                  {button}
-                </Tooltip>
-              );
-            })}
-          </List>
-        ))}
+            return open ? (
+              <Box key={route.id}>{button}</Box>
+            ) : (
+              <Tooltip key={route.id} title={route.label} placement="right">
+                {button}
+              </Tooltip>
+            );
+          })}
+        </List>
       </Box>
 
       <Stack

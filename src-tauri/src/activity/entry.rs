@@ -26,8 +26,8 @@ impl Serialize for Entry {
         S: Serializer,
     {
         let mut tuple = serializer.serialize_tuple(5)?;
-        tuple.serialize_element(&self.begin.timestamp_millis())?;
-        tuple.serialize_element(&self.end.timestamp_millis())?;
+        tuple.serialize_element(&self.begin.and_utc().timestamp_millis())?;
+        tuple.serialize_element(&self.end.and_utc().timestamp_millis())?;
         tuple.serialize_element(&self.activity.pid)?;
         tuple.serialize_element(&self.activity.exe)?;
         tuple.serialize_element(&self.activity.title)?;

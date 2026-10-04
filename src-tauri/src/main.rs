@@ -9,13 +9,14 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 use arc_swap::ArcSwap;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime};
 use storage::Storage;
 use tauri::menu::{Menu, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, State};
 
 mod activity;
+mod analytics;
 mod config;
 mod idle;
 mod storage;
@@ -24,6 +25,8 @@ mod tracker;
 
 use config::{Config, StorageDescription};
 use tracker::Tracker;
+
+use crate::analytics::DailyUsage;
 
 use crate::activity::Entry as ActivityEntry;
 
@@ -130,7 +133,8 @@ async fn run_tracker(handle: AppHandle) -> anyhow::Result<()> {
 }
 
 fn parse_timestamp(timestamp: i64) -> anyhow::Result<NaiveDateTime> {
-    let time = NaiveDateTime::from_timestamp_millis(timestamp)
+    let time = DateTime::from_timestamp_millis(timestamp)
+        .map(|time| time.naive_utc())
         .ok_or_else(|| anyhow!("Invalid timestamp: {}", timestamp))?;
     Ok(time)
 }
@@ -158,12 +162,38 @@ async fn select(
     }
 }
 
+async fn do_usage_daily(
+    from: i64,
+    to: i64,
+    storage: State<'_, Arc<dyn Storage>>,
+) -> anyhow::Result<Vec<DailyUsage>> {
+    // An empty or inverted range has no rows; skip the round trip to DuckDB.
+    if to <= from {
+        return Ok(Vec::new());
+    }
+    let from = parse_timestamp(from)?;
+    let to = parse_timestamp(to)?;
+    storage.usage_daily(from, to).await
+}
+
+#[tauri::command]
+async fn usage_daily(
+    from: i64,
+    to: i64,
+    storage: State<'_, Arc<dyn Storage>>,
+) -> Result<Vec<DailyUsage>, String> {
+    match do_usage_daily(from, to, storage).await {
+        Ok(rows) => Ok(rows),
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
 #[tauri::command]
 async fn active_dates(storage: State<'_, Arc<dyn Storage>>) -> Result<Vec<i64>, String> {
     match storage.active_dates().await {
         Ok(dates) => Ok(dates
             .into_iter()
-            .map(|date| date.and_hms_opt(0, 0, 0).unwrap().timestamp_millis())
+            .map(|date| date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis())
             .collect()),
         Err(e) => Err(dbg!(e.to_string())),
     }
@@ -191,6 +221,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             select,
             active_dates,
+            usage_daily,
             get_config,
             set_config,
         ])

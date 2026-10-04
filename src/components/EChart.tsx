@@ -1,7 +1,9 @@
-import { CustomChart, LineChart } from "echarts/charts";
+import { BarChart, CustomChart, LineChart } from "echarts/charts";
 import {
   DataZoomComponent,
   GridComponent,
+  LegendComponent,
+  LegendScrollComponent,
   MarkLineComponent,
   TooltipComponent,
 } from "echarts/components";
@@ -18,10 +20,14 @@ import { useEffect, useRef } from "react";
 echarts.use([
   CustomChart,
   LineChart,
+  BarChart,
   GridComponent,
   TooltipComponent,
   DataZoomComponent,
   MarkLineComponent,
+  LegendComponent,
+  // The History chart can carry dozens of series, so its legend scrolls.
+  LegendScrollComponent,
   CanvasRenderer,
 ]);
 
@@ -36,6 +42,7 @@ export function EChart({
   option,
   height,
   onEvents,
+  replaceMerge = ["series"],
 }: {
   option: EChartsCoreOption;
   height: number | string;
@@ -46,6 +53,17 @@ export function EChart({
    * handled inside ECharts so moving the mouse never re-renders the tree.
    */
   onEvents?: Record<string, (params: never) => void>;
+  /**
+   * Components whose arrays are replaced rather than merged.
+   *
+   * Series is the default because every chart here rebuilds its series from a
+   * model, and the series *count* can change: filtering the history chart down
+   * to one application, or leaving today and losing the timeline's "now" line.
+   * With `notMerge` off — kept off so dataZoom and legend state survive an
+   * update — a merge would leave the dropped series on the canvas, which looks
+   * like the change never happened.
+   */
+  replaceMerge?: string | string[];
 }) {
   const chartRef = useRef<ReactEChartsCore | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -79,6 +97,7 @@ export function EChart({
         echarts={echarts}
         option={option}
         notMerge={false}
+        replaceMerge={replaceMerge}
         lazyUpdate
         onEvents={onEvents}
         style={{ width: "100%", height: "100%" }}

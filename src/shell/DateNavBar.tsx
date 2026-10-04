@@ -7,6 +7,7 @@ import "react-day-picker/dist/style.css";
 import { useUi } from "../app/store";
 import { useActiveDates } from "../lib/hooks/useActiveDates";
 import { startOfUtcDay } from "../lib/time";
+import { pickerPaperSx } from "./pickerStyles";
 
 /**
  * UC-04: moving between days.
@@ -109,40 +110,7 @@ export function DateNavBar() {
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
-        <Paper
-          sx={{
-            p: 1,
-            bgcolor: "background.paper",
-            // Drive the picker from MUI's CSS variables so it follows the
-            // active colour scheme (a JS palette value would be the *default*
-            // scheme's literal and go stale on toggle).
-            "& .rdp-root": {
-              "--rdp-accent-color": "var(--mui-palette-primary-main)",
-              "--rdp-accent-background-color":
-                "rgb(var(--mui-palette-primary-mainChannel) / 0.25)",
-              "--rdp-today-color": "var(--mui-palette-primary-main)",
-              color: "var(--mui-palette-text-primary)",
-            },
-            "& .rdp-day_button": { position: "relative" },
-            "& .rdp-day": { color: "inherit" },
-            "& .rdp-disabled": { opacity: 0.3 },
-            "& .rdp-selected .rdp-day_button": {
-              bgcolor: "primary.main",
-              color: "primary.contrastText",
-            },
-            "& .rdp-hasActivity .rdp-day_button::after": {
-              content: '""',
-              position: "absolute",
-              bottom: 3,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 4,
-              height: 4,
-              borderRadius: "50%",
-              bgcolor: "primary.main",
-            },
-          }}
-        >
+        <Paper sx={pickerPaperSx}>
           <Box>
             {/* `modifiersClassNames` values are applied verbatim — react-day-picker
                 does not prefix them — so the name must match the selector above. */}

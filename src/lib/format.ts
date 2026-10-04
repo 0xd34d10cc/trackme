@@ -58,3 +58,43 @@ export function formatPercent(fraction: number): string {
   const percent = fraction * 100;
   return percent < 10 ? `${percent.toFixed(1)}%` : `${Math.round(percent)}%`;
 }
+
+// ---------------------------------------------------------------------------
+// Calendar-date labels, all in UTC (see the note in time.ts).
+// ---------------------------------------------------------------------------
+
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+/** "Sep 14" */
+export function formatDayShort(ms: number): string {
+  const date = new Date(ms);
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}`;
+}
+
+/** "Sep 14, 2026" */
+export function formatDayMedium(ms: number): string {
+  const date = new Date(ms);
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+}
+
+/**
+ * A half-open range as a human label, collapsing the year when both ends share
+ * it: "Sep 1 – Sep 30, 2026", "Sep 14 – 20, 2026", or across a year boundary
+ * "Dec 20, 2026 – Jan 4, 2027".
+ */
+export function formatRangeLabel(from: number, toExclusive: number): string {
+  const first = new Date(from);
+  const last = new Date(Math.max(from, toExclusive - DAY));
+  const sameYear = first.getUTCFullYear() === last.getUTCFullYear();
+  if (!sameYear) {
+    return `${formatDayMedium(from)} – ${formatDayMedium(last.getTime())}`;
+  }
+  const year = first.getUTCFullYear();
+  if (first.getUTCMonth() === last.getUTCMonth()) {
+    return `${MONTHS[first.getUTCMonth()]} ${first.getUTCDate()} – ${last.getUTCDate()}, ${year}`;
+  }
+  return `${MONTHS[first.getUTCMonth()]} ${first.getUTCDate()} – ${MONTHS[last.getUTCMonth()]} ${last.getUTCDate()}, ${year}`;
+}

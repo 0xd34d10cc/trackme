@@ -2,6 +2,8 @@
 export const qk = {
   /** Keyed by the day window, not the raw entries — one entry per day. */
   activities: (from: number, to: number) => ["activities", from, to] as const,
+  /** Per (day, exe) range rollup. One entry per distinct [from, to). */
+  usageDaily: (from: number, to: number) => ["usageDaily", from, to] as const,
   activeDates: () => ["activeDates"] as const,
   config: () => ["config"] as const,
 };
