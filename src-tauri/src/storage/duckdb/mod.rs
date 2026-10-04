@@ -65,7 +65,9 @@ impl super::Storage for Storage {
             let connection = connection.lock().unwrap();
             let mut statement = connection.prepare_cached(SELECT_ACTIVITIES)?;
             let query = statement.query_map(
-                params![from.timestamp_millis(), to.timestamp_millis()],
+                // to first, from second: select_activities.sql is an overlap
+                // predicate (begin_ms < to_ms and end_ms > from_ms)
+                params![to.timestamp_millis(), from.timestamp_millis()],
                 |row| {
                     let begin: i64 = row.get(0)?;
                     let end: i64 = row.get(1)?;
@@ -112,38 +114,6 @@ impl super::Storage for Storage {
 
             Ok(dates)
         })
-        .await?
-    }
-
-    async fn duration_by_exe(
-        &self,
-        from: NaiveDateTime,
-        to: NaiveDateTime,
-    ) -> anyhow::Result<Vec<(String, std::time::Duration)>> {
-        const SELECT_DURATION_BY_EXE: &str = include_str!("duration_by_exe.sql");
-
-        let connection = self.connection.clone();
-        tauri::async_runtime::spawn_blocking(
-            move || -> anyhow::Result<Vec<(String, std::time::Duration)>> {
-                let connection = connection.lock().unwrap();
-                let mut statement = connection.prepare_cached(SELECT_DURATION_BY_EXE)?;
-                let query = statement.query_map(
-                    params![from.timestamp_millis(), to.timestamp_millis()],
-                    |row| {
-                        let exe: String = row.get(0)?;
-                        let duration: i64 = row.get(1)?;
-                        Ok((exe, std::time::Duration::from_millis(duration as u64)))
-                    },
-                )?;
-
-                let mut durations = Vec::new();
-                for duration in query {
-                    durations.push(duration?);
-                }
-
-                Ok(durations)
-            },
-        )
         .await?
     }
 }

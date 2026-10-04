@@ -169,33 +169,6 @@ async fn active_dates(storage: State<'_, Arc<dyn Storage>>) -> Result<Vec<i64>, 
     }
 }
 
-async fn do_duration_by_exe(
-    from: i64,
-    to: i64,
-    storage: State<'_, Arc<dyn Storage>>,
-) -> anyhow::Result<Vec<(String, i64)>> {
-    let from = parse_timestamp(from)?;
-    let to = parse_timestamp(to)?;
-    let durations = storage.duration_by_exe(from, to).await?;
-    let durations = durations
-        .into_iter()
-        .map(|(exe, duration)| (exe, duration.as_millis() as i64))
-        .collect();
-    Ok(durations)
-}
-
-#[tauri::command]
-async fn duration_by_exe(
-    from: i64,
-    to: i64,
-    storage: State<'_, Arc<dyn Storage>>,
-) -> Result<Vec<(String, i64)>, String> {
-    match do_duration_by_exe(from, to, storage).await {
-        Ok(durations) => Ok(durations),
-        Err(e) => Err(dbg!(e.to_string())),
-    }
-}
-
 #[tauri::command]
 fn get_config(config: State<'_, ArcSwap<Config>>) -> Arc<Config> {
     config.load_full()
@@ -218,7 +191,6 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             select,
             active_dates,
-            duration_by_exe,
             get_config,
             set_config,
         ])

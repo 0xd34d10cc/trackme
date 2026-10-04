@@ -1,0 +1,14 @@
+/* The only global CSS in the app. Everything else is MUI (`sx`, `styled`, or
+   theme overrides), so this file stays limited to the document shell. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  /* The app owns its own scroll regions; the document itself never scrolls. */
+  overflow: hidden;
+}
