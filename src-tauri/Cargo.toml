@@ -44,3 +44,11 @@ windows = { version = "0.62", features = [
     "Win32_System_ProcessStatus",
     "Win32_System_SystemInformation",
 ] }
+
+# Shrink the release binary. Without LTO the linker cannot discard unused code
+# across crates, which matters a lot with Tauri 2's ~450-crate tree.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

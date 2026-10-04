@@ -3,6 +3,7 @@
   "productName": "trackme",
   "version": "0.1.0",
   "identifier": "com.trackme.app",
+  "mainBinaryName": "trackme",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
